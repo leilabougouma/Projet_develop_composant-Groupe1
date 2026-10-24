@@ -1,0 +1,15 @@
+# Secrets locaux
+.env
+
+# Java / Maven (partie API)
+target/
+*.class
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Systèmes
+.DS_Store
+Thumbs.db

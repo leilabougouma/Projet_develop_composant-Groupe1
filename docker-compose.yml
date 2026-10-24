@@ -1,0 +1,93 @@
+# =====================================================================
+# Environnement du projet "API REST de produits"
+#   - mysql    : base SOURCE (données brutes)        -> utilisée par l'ETL Apache Hop
+#   - postgres : base CIBLE (données propres)        -> utilisée par l'ETL et l'API
+#   - api, prometheus : à décommenter quand les parties 3 et 4 seront prêtes
+#
+# Démarrage :  cp .env.example .env   puis   docker compose up -d
+# =====================================================================
+
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: produits-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      TZ: ${TZ}
+    # UTF-8 complet, pour que les accents (Électronique, Vêtements...) soient bien stockés
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "${MYSQL_PORT}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      # Scripts exécutés au PREMIER démarrage uniquement, par ordre alphabétique (01-, 02-)
+      - ./db/mysql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  postgres:
+    image: postgres:16
+    container_name: produits-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: ${TZ}
+    ports:
+      - "${PG_PORT}:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./db/postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # ------------------------------------------------------------------
+  # Partie 3 (API Spring Boot) : à décommenter quand api/Dockerfile existe
+  # ------------------------------------------------------------------
+  # api:
+  #   build: ./api
+  #   container_name: produits-api
+  #   restart: unless-stopped
+  #   environment:
+  #     DB_HOST: postgres
+  #     POSTGRES_USER: ${POSTGRES_USER}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  #   ports:
+  #     - "${API_PORT}:8080"
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+
+  # ------------------------------------------------------------------
+  # Partie 4 (Prometheus) : à décommenter quand monitoring/prometheus.yml existe
+  # ------------------------------------------------------------------
+  # prometheus:
+  #   image: prom/prometheus:v2.53.0
+  #   container_name: produits-prometheus
+  #   restart: unless-stopped
+  #   volumes:
+  #     - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+  #   ports:
+  #     - "${PROMETHEUS_PORT}:9090"
+  #   depends_on:
+  #     - api
+
+volumes:
+  mysql_data:
+  pg_data:
