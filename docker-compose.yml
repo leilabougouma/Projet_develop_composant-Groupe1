@@ -58,21 +58,21 @@ services:
       start_period: 20s
 
   # ------------------------------------------------------------------
-  # Partie 3 (API Spring Boot) : à décommenter quand api/Dockerfile existe
+  # Partie 3 (API Spring Boot)
   # ------------------------------------------------------------------
-  # api:
-  #   build: ./api
-  #   container_name: produits-api
-  #   restart: unless-stopped
-  #   environment:
-  #     DB_HOST: postgres
-  #     POSTGRES_USER: ${POSTGRES_USER}
-  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-  #   ports:
-  #     - "${API_PORT}:8080"
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
+  api:
+    build: ./api
+    container_name: produits-api
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${API_PORT}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   # ------------------------------------------------------------------
   # Partie 4 (Prometheus) : à décommenter quand monitoring/prometheus.yml existe

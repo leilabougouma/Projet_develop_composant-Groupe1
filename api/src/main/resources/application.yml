@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: produits-api
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:5432/produits_db
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate   # le schéma est créé par les scripts SQL, pas par Hibernate
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
