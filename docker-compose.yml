@@ -75,18 +75,18 @@ services:
         condition: service_healthy
 
   # ------------------------------------------------------------------
-  # Partie 4 (Prometheus) : à décommenter quand monitoring/prometheus.yml existe
+  # Partie 4 (Prometheus)
   # ------------------------------------------------------------------
-  # prometheus:
-  #   image: prom/prometheus:v2.53.0
-  #   container_name: produits-prometheus
-  #   restart: unless-stopped
-  #   volumes:
-  #     - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-  #   ports:
-  #     - "${PROMETHEUS_PORT}:9090"
-  #   depends_on:
-  #     - api
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: produits-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "${PROMETHEUS_PORT}:9090"
+    depends_on:
+      - api
 
 volumes:
   mysql_data:
