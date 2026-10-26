@@ -2,7 +2,7 @@
 
 Projet « Développement à base de composants et services web » — M1 IBAM 2026 — Exercice 1.
 
-> Les sections *Architecture*, *ETL*, *API*, *Supervision* et *Tests* seront complétées par les autres membres du groupe.
+> Les sections *Architecture*, *ETL* et *Supervision* seront complétées par les autres membres du groupe. La section *API* est décrite ci-dessous.
 
 ## Prérequis
 
@@ -87,7 +87,76 @@ docker compose exec postgres psql -U produits_user -d produits_db
 
 | Problème | Solution |
 |---|---|
-| `port is already allocated` | Changer `MYSQL_PORT` ou `PG_PORT` dans `.env`, puis `docker compose up -d` |
+| `port is already allocated` | Changer `MYSQL_PORT`, `PG_PORT` ou `API_PORT` dans `.env`, puis `docker compose up -d` (ou arrêter le programme qui occupe le port, ex. `docker stop <conteneur>`) |
 | Les tables ou les données n'apparaissent pas | Les scripts ne s'exécutent qu'au premier démarrage : faire `docker compose down -v` puis `docker compose up -d` |
 | Accents mal affichés dans MySQL | Se connecter avec `--default-character-set=utf8mb4` |
 | Service `unhealthy` | Regarder `docker compose logs <service>` (souvent une variable manquante dans `.env`) |
+
+## API REST (Spring Boot)
+
+Code dans `api/` : Spring Boot 3.3 / Java 17, architecture en couches `entity`, `repository`, `service`, `controller`, avec des DTO en entrée et en sortie. Le schéma est créé par les scripts SQL de `db/` (`ddl-auto: validate`), pas par Hibernate.
+
+### Démarrage
+
+```bash
+cp .env.example .env              # si ce n'est pas déjà fait
+docker compose up -d --build      # démarre MySQL, PostgreSQL et l'API
+curl http://localhost:8080/actuator/health     # {"status":"UP"}
+```
+
+| URL | Rôle |
+|---|---|
+| `http://localhost:8080/swagger-ui/index.html` | Documentation interactive (`/` redirige vers cette page) |
+| `http://localhost:8080/v3/api-docs` | Contrat OpenAPI généré à la volée |
+| `http://localhost:8080/actuator/health` | État de l'application |
+
+L'API lit `DB_HOST` (par défaut `localhost`), `POSTGRES_USER` et `POSTGRES_PASSWORD`. Dans Docker, `DB_HOST=postgres` est fourni par `docker-compose.yml`. Pour lancer l'API hors Docker, il faut exporter ces variables, puis `cd api && mvn spring-boot:run`.
+
+### Endpoints
+
+| Opération | Méthode | URL | Succès | Erreurs |
+|---|---|---|---|---|
+| Lister (pagination, filtre catégorie) | GET | `/api/v1/produits?categorie=&page=0&size=20` | 200 | 400 si `page` < 0 ou `size` hors 1 à 100 |
+| Consulter | GET | `/api/v1/produits/{id}` | 200 | 404 |
+| Créer | POST | `/api/v1/produits` | 201 + en-tête `Location` | 400 |
+| Modifier | PUT | `/api/v1/produits/{id}` | 200 | 400, 404 |
+| Supprimer | DELETE | `/api/v1/produits/{id}` | 204 | 404 |
+
+- Le filtre `categorie` ignore la casse. Les résultats sont triés par `id`.
+- La liste renvoie `{content, page, size, totalElements, totalPages}`.
+- `dateCreation` est posée par la base à la création et n'est jamais modifiée par un `PUT`.
+
+Validation du corps (`nom` et `categorie` non vides, `prix` >= 0, `quantite` >= 0) :
+
+```bash
+curl -X POST http://localhost:8080/api/v1/produits -H 'Content-Type: application/json' \
+  -d '{"nom":"Clavier","description":"AZERTY","prix":59.90,"quantite":25,"categorie":"Informatique"}'
+```
+
+Toutes les erreurs ont le même format JSON (gestion centralisée dans `GlobalExceptionHandler`), y compris une route inconnue :
+
+```json
+{"timestamp":"...","status":400,"error":"Bad Request","message":"Données invalides",
+ "path":"/api/v1/produits","details":[{"champ":"prix","message":"Le prix doit être positif ou nul"}]}
+```
+
+### Contrat OpenAPI
+
+Le contrat `api/openapi.yaml` est généré par springdoc puis exporté dans le dépôt. Pour le régénérer après une modification de l'API :
+
+```bash
+cd api && mvn test -Dtest=OpenApiExportTest -Dopenapi.export=true
+```
+
+### Tests
+
+```bash
+cd api && mvn test
+```
+
+28 tests (JUnit 5) : tests unitaires du service (Mockito) et tests d'intégration MockMvc de bout en bout (contrôleur, service, JPA, base **H2 en mode PostgreSQL**, avec le schéma de `api/src/test/resources/schema-test.sql`). Ils n'ont pas besoin de Docker. Testcontainers n'est pas utilisé (optionnel).
+
+### Modifications apportées à l'environnement
+
+- `docker-compose.yml` : le service `api` (build de `./api`, port `API_PORT`, attend que PostgreSQL soit `healthy`) est activé.
+- Fichiers ajoutés dans `api/` : `pom.xml`, `Dockerfile` (build Maven puis image JRE 17, utilisateur non-root), `.dockerignore`, `openapi.yaml`, `src/`.
