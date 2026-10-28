@@ -2,10 +2,29 @@
 # Environnement du projet "API REST de produits"
 #   - mysql    : base SOURCE (données brutes)        -> utilisée par l'ETL Apache Hop
 #   - postgres : base CIBLE (données propres)        -> utilisée par l'ETL et l'API
-#   - api, prometheus : à décommenter quand les parties 3 et 4 seront prêtes
+#   - api        : API REST Spring Boot (partie 3)
+#   - prometheus : supervision de l'API (partie 4)
+#   - etl        : ETL Apache Hop (partie 2), lancé à la demande :
+#                    docker compose run --rm etl
+#   - hop-web    : interface graphique Hop dans le navigateur (optionnelle) :
+#                    docker compose --profile hop-web up -d hop-web   ->  http://localhost:8090/ui
 #
 # Démarrage :  cp .env.example .env   puis   docker compose up -d
 # =====================================================================
+
+# Variables communes aux deux services Hop (etl et hop-web) : projet, environnement
+# et identifiants des bases lus dans .env (jamais écrits dans les fichiers Hop versionnés)
+x-hop-env: &hop-env
+  HOP_PROJECT_NAME: produits-etl
+  HOP_PROJECT_FOLDER: /files/hop-projet
+  HOP_ENVIRONMENT_NAME: docker
+  HOP_ENVIRONMENT_CONFIG_FILE_NAME_PATHS: /files/hop-projet/config/docker-config.json
+  MYSQL_DATABASE: ${MYSQL_DATABASE}
+  MYSQL_USER: ${MYSQL_USER}
+  MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+  POSTGRES_DB: ${POSTGRES_DB}
+  POSTGRES_USER: ${POSTGRES_USER}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
 services:
 
@@ -56,6 +75,49 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
+
+  # ------------------------------------------------------------------
+  # Partie 2 (ETL Apache Hop) : services lancés à la demande, pas par "up"
+  # ------------------------------------------------------------------
+
+  # Exécute le workflow puis s'arrête. Aucun port publié (pas de conflit avec l'API).
+  #   docker compose run --rm etl
+  etl:
+    build:
+      context: ./etl
+      target: run
+    container_name: produits-etl
+    profiles: ["etl"]
+    environment:
+      <<: *hop-env
+      HOP_FILE_PATH: /files/hop-projet/wf_etl_produits.hwf
+      HOP_RUN_CONFIG: local
+      HOP_LOG_LEVEL: Basic
+      HOP_CUSTOM_ENTRYPOINT_EXTENSION_SHELL_FILE_PATH: /files/docker/variables-depuis-env.sh
+    volumes:
+      - ./etl:/files:ro
+    depends_on: &bases-pretes
+      mysql:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  # Interface graphique de Hop dans le navigateur (optionnelle).
+  #   docker compose --profile hop-web up -d hop-web   ->  http://localhost:8090/ui
+  # Écoute sur 8080 dans le conteneur, publié sur HOP_WEB_PORT (8090) : pas de conflit avec l'API.
+  hop-web:
+    build:
+      context: ./etl
+      target: web
+    container_name: produits-hop-web
+    profiles: ["hop-web"]
+    environment:
+      <<: *hop-env
+    ports:
+      - "${HOP_WEB_PORT:-8090}:8080"
+    volumes:
+      - ./etl:/files          # lecture/écriture : ce qui est enregistré dans Hop Web arrive dans etl/
+    depends_on: *bases-pretes
 
   # ------------------------------------------------------------------
   # Partie 3 (API Spring Boot)

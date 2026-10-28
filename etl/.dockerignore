@@ -1,0 +1,2 @@
+# Les images ne copient aucun fichier : le dossier etl/ est monté au démarrage (voir docker-compose.yml)
+*
