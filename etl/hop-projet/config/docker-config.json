@@ -1,0 +1,9 @@
+{
+  "variables": [
+    { "name": "MYSQL_HOST", "value": "mysql", "description": "Nom du service MySQL dans docker-compose" },
+    { "name": "MYSQL_PORT", "value": "3306", "description": "Port interne au réseau Docker" },
+    { "name": "PG_HOST", "value": "postgres", "description": "Nom du service PostgreSQL dans docker-compose" },
+    { "name": "PG_PORT", "value": "5432", "description": "Port interne au réseau Docker" },
+    { "name": "CATEGORIES_CSV", "value": "${PROJECT_HOME}/../referentiel/categories.csv", "description": "Référentiel des catégories" }
+  ]
+}

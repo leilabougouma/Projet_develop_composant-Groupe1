@@ -1,0 +1,27 @@
+{
+  "rdbms": {
+    "MYSQL": {
+      "databaseName": "${MYSQL_DB}",
+      "pluginId": "MYSQL",
+      "accessType": 0,
+      "hostname": "${MYSQL_HOST}",
+      "password": "${MYSQL_PASSWORD}",
+      "pluginName": "MySQL",
+      "port": "${MYSQL_PORT}",
+      "attributes": {
+        "EXTRA_OPTION_MYSQL.useSSL": "false",
+        "EXTRA_OPTION_MYSQL.allowPublicKeyRetrieval": "true",
+        "SUPPORTS_TIMESTAMP_DATA_TYPE": "Y",
+        "QUOTE_ALL_FIELDS": "N",
+        "SUPPORTS_BOOLEAN_DATA_TYPE": "Y",
+        "FORCE_IDENTIFIERS_TO_LOWERCASE": "N",
+        "PRESERVE_RESERVED_WORD_CASE": "Y",
+        "FORCE_IDENTIFIERS_TO_UPPERCASE": "N",
+        "PREFERRED_SCHEMA_NAME": ""
+      },
+      "manualUrl": "",
+      "username": "${MYSQL_USER}"
+    }
+  },
+  "name": "mysql_source"
+}

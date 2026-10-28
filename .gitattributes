@@ -1,1 +1,5 @@
 *.sh text eol=lf
+*.json text eol=lf
+*.hpl text eol=lf
+*.hwf text eol=lf
+*.csv text eol=lf
