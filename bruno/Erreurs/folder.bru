@@ -1,0 +1,11 @@
+meta {
+  name: Erreurs
+  seq: 2
+}
+
+docs {
+  Cas d'erreur : l'API doit toujours répondre avec le même format JSON
+  `{timestamp, status, error, message, path, details?}` (gestion centralisée dans `GlobalExceptionHandler`).
+
+  Ces requêtes sont indépendantes les unes des autres et de la variable `produitId`.
+}

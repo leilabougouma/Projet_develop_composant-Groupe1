@@ -48,8 +48,11 @@ public class ProduitService {
     }
 
     @Transactional
-    public void supprimer(Integer id) {
-        repository.delete(trouver(id));
+    public ProduitResponse supprimer(Integer id) {
+        Produit produit = trouver(id);
+        ProduitResponse supprime = ProduitResponse.from(produit);
+        repository.delete(produit);
+        return supprime;
     }
 
     private Produit trouver(Integer id) {

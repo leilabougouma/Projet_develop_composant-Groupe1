@@ -1,0 +1,45 @@
+meta {
+  name: Supprimer un produit
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/produits/{{produitId}}
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("la réponse confirme la suppression", function () {
+    var id = Number(bru.getVar("produitId") || bru.getEnvVar("produitId"));
+    expect(res.body.message, "message de confirmation").to.equal("Produit " + id + " supprimé");
+  });
+
+  test("la réponse rappelle le produit supprimé", function () {
+    var id = Number(bru.getVar("produitId") || bru.getEnvVar("produitId"));
+    expect(res.body.produit, "produit supprimé").to.be.an("object");
+    expect(res.body.produit.id, "id du produit supprimé").to.equal(id);
+    expect(res.body.produit, "champs du produit supprimé").to.have.all.keys(
+      "id", "nom", "description", "prix", "quantite", "categorie", "dateCreation");
+
+    var nomAttendu = bru.getVar("nom");
+    if (nomAttendu) {
+      expect(res.body.produit.nom, "nom du produit supprimé (dernière version modifiée)").to.equal(nomAttendu);
+    }
+  });
+}
+
+docs {
+  Réponse 200 avec un message de confirmation et le produit tel qu'il était avant suppression :
+
+  ```json
+  { "message": "Produit 12 supprimé", "produit": { "id": 12, "nom": "...", ... } }
+  ```
+
+  Un second appel renvoie 404 (voir « Vérifier la suppression »).
+}

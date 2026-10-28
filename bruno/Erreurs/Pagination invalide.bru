@@ -1,0 +1,38 @@
+meta {
+  name: Pagination invalide (400)
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/produits?page=-1&size=500
+  body: none
+  auth: none
+}
+
+params:query {
+  page: -1
+  size: 500
+}
+
+assert {
+  res.status: eq 400
+}
+
+tests {
+  test("page et size hors limites sont rejetés", function () {
+    expect(res.body.status, "code dans le corps").to.equal(400);
+    expect(res.body.message, "message").to.equal("Paramètres invalides");
+    expect(res.body.details, "détails").to.have.length.of.at.least(1);
+  });
+
+  test("les deux paramètres fautifs sont expliqués", function () {
+    var messages = res.body.details.map(function (d) { return d.message; });
+    expect(messages, "messages de validation").to.include("page doit être >= 0");
+    expect(messages, "messages de validation").to.include("size doit être <= 100");
+  });
+}
+
+docs {
+  `page` doit être >= 0 et `size` compris entre 1 et 100.
+}

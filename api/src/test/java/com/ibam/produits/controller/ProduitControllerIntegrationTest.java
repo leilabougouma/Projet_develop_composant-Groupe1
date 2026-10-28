@@ -108,10 +108,14 @@ class ProduitControllerIntegrationTest {
     }
 
     @Test
-    void supprimerRenvoie204PuisLeProduitDisparait() throws Exception {
+    void supprimerRenvoie200AvecConfirmationPuisLeProduitDisparait() throws Exception {
         int id = creer(VALIDE);
 
-        mvc.perform(delete(BASE + "/" + id)).andExpect(status().isNoContent());
+        mvc.perform(delete(BASE + "/" + id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Produit " + id + " supprimé"))
+                .andExpect(jsonPath("$.produit.id").value(id))
+                .andExpect(jsonPath("$.produit.nom").value("Clavier"));
         mvc.perform(get(BASE + "/" + id)).andExpect(status().isNotFound());
     }
 

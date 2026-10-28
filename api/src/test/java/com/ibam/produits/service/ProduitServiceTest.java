@@ -117,9 +117,10 @@ class ProduitServiceTest {
         Produit p = produit(1);
         when(repository.findById(1)).thenReturn(Optional.of(p));
 
-        service.supprimer(1);
+        ProduitResponse supprime = service.supprimer(1);
 
         verify(repository).delete(p);
+        assertThat(supprime.id()).isEqualTo(1);
     }
 
     @Test

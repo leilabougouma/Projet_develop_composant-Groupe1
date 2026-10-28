@@ -1,0 +1,16 @@
+meta {
+  name: Produits
+  seq: 1
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:8080
+}
+
+docs {
+  CRUD complet sur `/api/v1/produits`.
+
+  Lancer le dossier avec le Runner (dans l'ordre) : Lister, Lister par catégorie, Créer, Consulter, Modifier, Supprimer, Vérifier la suppression.
+  La requête **Créer** mémorise l'id du produit dans la variable `produitId`, utilisée ensuite par Consulter, Modifier, Supprimer et Vérifier la suppression.
+  Le parcours complet crée puis supprime un produit : la base retrouve son état initial.
+}

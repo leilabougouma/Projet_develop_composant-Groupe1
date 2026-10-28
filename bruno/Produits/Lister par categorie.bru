@@ -1,0 +1,38 @@
+meta {
+  name: Lister par catégorie
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/produits?categorie=informatique&page=0&size=20
+  body: none
+  auth: none
+}
+
+params:query {
+  categorie: informatique
+  page: 0
+  size: 20
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("tous les produits sont de la catégorie demandée (casse ignorée)", function () {
+    expect(res.body.content, "content").to.be.an("array");
+    res.body.content.forEach(function (p) {
+      expect(p.categorie.toLowerCase(), "catégorie du produit " + p.id).to.equal("informatique");
+    });
+  });
+
+  test("le total correspond au nombre de produits trouvés", function () {
+    expect(res.body.totalElements, "totalElements").to.be.at.least(res.body.content.length);
+  });
+}
+
+docs {
+  Le filtre est volontairement écrit en minuscules : il ignore la casse et doit renvoyer aussi les produits « Informatique ».
+}

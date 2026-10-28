@@ -1,0 +1,37 @@
+meta {
+  name: Modifier - données invalides (400)
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/api/v1/produits/{{produitId}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "nom": "Produit sans prix valide",
+    "prix": -1,
+    "quantite": 0,
+    "categorie": "Informatique"
+  }
+}
+
+assert {
+  res.status: eq 400
+}
+
+tests {
+  test("le prix négatif est signalé", function () {
+    expect(res.body.message, "message").to.equal("Données invalides");
+    var champs = res.body.details.map(function (d) { return d.champ; });
+    expect(champs, "champs signalés").to.eql(["prix"]);
+    expect(res.body.details[0].message, "message du champ prix").to.equal("Le prix doit être positif ou nul");
+  });
+}
+
+docs {
+  La validation du corps est faite avant la recherche du produit : la réponse est 400 même si `produitId` n'existe pas.
+}

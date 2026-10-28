@@ -152,7 +152,7 @@ curl http://localhost:8080/actuator/health     # {"status":"UP"}
 |---|---|
 | `http://localhost:8080/swagger-ui/index.html` | Documentation interactive (`/` redirige vers cette page) |
 | `http://localhost:8080/v3/api-docs` | Contrat OpenAPI généré à la volée |
-| `http://localhost:8080/actuator/health` | État de l'application |
+| `http://localhost:8080/actuator/health` | État de l'application et de chaque composant (base PostgreSQL, espace disque, ping) |
 
 L'API lit `DB_HOST` (par défaut `localhost`), `POSTGRES_USER` et `POSTGRES_PASSWORD`. Dans Docker, `DB_HOST=postgres` est fourni par `docker-compose.yml`. Pour lancer l'API hors Docker, il faut exporter ces variables, puis `cd api && mvn spring-boot:run`.
 
@@ -164,11 +164,16 @@ L'API lit `DB_HOST` (par défaut `localhost`), `POSTGRES_USER` et `POSTGRES_PASS
 | Consulter | GET | `/api/v1/produits/{id}` | 200 | 404 |
 | Créer | POST | `/api/v1/produits` | 201 + en-tête `Location` | 400 |
 | Modifier | PUT | `/api/v1/produits/{id}` | 200 | 400, 404 |
-| Supprimer | DELETE | `/api/v1/produits/{id}` | 204 | 404 |
+| Supprimer | DELETE | `/api/v1/produits/{id}` | 200 + message de confirmation et produit supprimé | 404 |
 
 - Le filtre `categorie` ignore la casse. Les résultats sont triés par `id`.
 - La liste renvoie `{content, page, size, totalElements, totalPages}`.
 - `dateCreation` est posée par la base à la création et n'est jamais modifiée par un `PUT`.
+- Un `DELETE` réussi renvoie le produit tel qu'il était avant suppression :
+
+```json
+{"message":"Produit 12 supprimé","produit":{"id":12,"nom":"Clavier","description":"AZERTY","prix":59.90,"quantite":25,"categorie":"Informatique","dateCreation":"..."}}
+```
 
 Validation du corps (`nom` et `categorie` non vides, `prix` >= 0, `quantite` >= 0) :
 
@@ -192,11 +197,17 @@ Le contrat `api/openapi.yaml` est généré par springdoc puis exporté dans le 
 cd api && mvn test -Dtest=OpenApiExportTest -Dopenapi.export=true
 ```
 
+### Collection Bruno
+
+Le dossier `bruno/` contient une collection [Bruno](https://www.usebruno.com/) qui couvre tous les endpoints (CRUD, cas d'erreur, supervision), avec des tests sur chaque réponse. Dans Bruno : **Open Collection** → dossier `bruno/`, puis environnement **Local** (`baseUrl = http://localhost:8080`). Le dossier *Produits* se lance dans l'ordre avec le Runner : il crée puis supprime un produit.
+
 ### Tests
 
 ```bash
 cd api && mvn test
 ```
+
+> Le projet cible Java 17. Si `mvn -version` affiche une version plus récente (ex. 27), la compilation échoue (Lombok) : lancer Maven avec `JAVA_HOME=$(/usr/libexec/java_home -v 17) mvn test` (macOS).
 
 28 tests (JUnit 5) : tests unitaires du service (Mockito) et tests d'intégration MockMvc de bout en bout (contrôleur, service, JPA, base **H2 en mode PostgreSQL**, avec le schéma de `api/src/test/resources/schema-test.sql`). Ils n'ont pas besoin de Docker. Testcontainers n'est pas utilisé (optionnel).
 

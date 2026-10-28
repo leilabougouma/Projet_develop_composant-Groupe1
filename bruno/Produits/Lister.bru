@@ -1,0 +1,45 @@
+meta {
+  name: Lister les produits
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/produits?page=0&size=20
+  body: none
+  auth: none
+}
+
+params:query {
+  page: 0
+  size: 20
+  ~categorie: Informatique
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("la réponse est une page", function () {
+    expect(res.body.content, "content").to.be.an("array");
+    expect(res.body.page, "numéro de page").to.equal(0);
+    expect(res.body.size, "taille de page").to.equal(20);
+    expect(res.body, "métadonnées de pagination").to.include.all.keys("totalElements", "totalPages");
+  });
+
+  test("les compteurs sont cohérents avec le contenu", function () {
+    expect(res.body.content.length, "nombre d'éléments de la page").to.be.at.most(res.body.size);
+    expect(res.body.content.length, "éléments de la page <= totalElements").to.be.at.most(res.body.totalElements);
+  });
+
+  test("les produits sont triés par id croissant", function () {
+    var ids = res.body.content.map(function (p) { return p.id; });
+    var tries = ids.slice().sort(function (a, b) { return a - b; });
+    expect(ids, "ids dans l'ordre reçu").to.eql(tries);
+  });
+}
+
+docs {
+  `page` (>= 0, défaut 0), `size` (1 à 100, défaut 20), `categorie` (optionnel, casse ignorée). Tri par `id`.
+}

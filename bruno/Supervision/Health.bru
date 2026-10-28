@@ -1,0 +1,42 @@
+meta {
+  name: Santé de l'application
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/actuator/health
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:8080
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq UP
+}
+
+tests {
+  test("la base de données PostgreSQL répond", function () {
+    expect(res.body.components.db.status, "état de la base").to.equal("UP");
+    expect(res.body.components.db.details.database, "type de base").to.equal("PostgreSQL");
+  });
+
+  test("l'espace disque est suffisant", function () {
+    var disque = res.body.components.diskSpace;
+    expect(disque.status, "état du disque").to.equal("UP");
+    expect(disque.details.free, "espace libre (octets)").to.be.above(disque.details.threshold);
+  });
+
+  test("l'application répond (ping)", function () {
+    expect(res.body.components.ping.status, "état du ping").to.equal("UP");
+  });
+}
+
+docs {
+  Renvoie l'état global et celui de chaque composant : base de données, espace disque, ping.
+  Réglé par `management.endpoint.health.show-details: always` dans `api/src/main/resources/application.yml`.
+}

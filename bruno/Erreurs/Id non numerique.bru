@@ -1,0 +1,23 @@
+meta {
+  name: Identifiant non numérique (400)
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/produits/abc
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 400
+}
+
+tests {
+  test("le paramètre id est signalé invalide", function () {
+    expect(res.body.status, "code dans le corps").to.equal(400);
+    expect(res.body.message, "message").to.equal("Valeur invalide pour le paramètre 'id'");
+    expect(res.body.path, "chemin demandé").to.equal("/api/v1/produits/abc");
+  });
+}
