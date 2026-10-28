@@ -1,0 +1,33 @@
+meta {
+  name: Consulter un produit
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/produits/{{produitId}}
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("le produit renvoyé est celui demandé", function () {
+    var attendu = Number(bru.getVar("produitId") || bru.getEnvVar("produitId"));
+    expect(res.body.id, "id du produit").to.equal(attendu);
+  });
+
+  test("le produit contient tous ses champs", function () {
+    expect(res.body, "champs du produit").to.have.all.keys(
+      "id", "nom", "description", "prix", "quantite", "categorie", "dateCreation");
+    expect(res.body.prix, "prix").to.be.a("number");
+    expect(res.body.quantite, "quantité").to.be.a("number");
+  });
+}
+
+docs {
+  Utilise `produitId` : la valeur mémorisée par « Créer un produit », sinon celle de l'environnement (1 par défaut).
+}

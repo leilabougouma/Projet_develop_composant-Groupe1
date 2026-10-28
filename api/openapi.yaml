@@ -62,18 +62,18 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-        "200":
-          description: Produit modifié
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ProduitResponse"
         "404":
           description: Produit absent
           content:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: Produit modifié
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProduitResponse"
     delete:
       tags:
       - Produits
@@ -87,8 +87,12 @@ paths:
           type: integer
           format: int32
       responses:
-        "204":
-          description: Produit supprimé
+        "200":
+          description: Produit supprimé (message de confirmation et produit supprimé)
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SuppressionResponse"
         "404":
           description: Produit absent
           content:
@@ -257,3 +261,13 @@ components:
         totalPages:
           type: integer
           format: int32
+    SuppressionResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Produit 12 supprimé
+        produit:
+          $ref: "#/components/schemas/ProduitResponse"
+      description: "Confirmation de suppression, avec le produit tel qu'il était avant\
+        \ d'être supprimé"

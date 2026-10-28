@@ -1,0 +1,36 @@
+meta {
+  name: Contrat OpenAPI
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/v3/api-docs
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:8080
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("le contrat décrit les endpoints produits", function () {
+    expect(res.body.openapi, "version OpenAPI").to.be.a("string");
+    expect(res.body.paths, "chemins documentés").to.have.property("/api/v1/produits");
+    expect(res.body.paths, "chemins documentés").to.have.property("/api/v1/produits/{id}");
+  });
+
+  test("la suppression est documentée avec sa réponse 200", function () {
+    var responses = res.body.paths["/api/v1/produits/{id}"].delete.responses;
+    expect(responses, "réponses du DELETE").to.have.all.keys("200", "404");
+  });
+}
+
+docs {
+  Contrat généré à la volée par springdoc. La copie versionnée est dans `api/openapi.yaml`.
+}

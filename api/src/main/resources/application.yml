@@ -8,13 +8,16 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: validate   # le schéma est créé par les scripts SQL, pas par Hibernate
+      ddl-auto: validate # le schéma est créé par les scripts SQL, pas par Hibernate
 
 management:
   endpoints:
     web:
       exposure:
         include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: always   # détail par composant (base PostgreSQL, disque...) au lieu de {"status":"UP"} seul
 
 springdoc:
   api-docs:

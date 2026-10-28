@@ -1,0 +1,24 @@
+meta {
+  name: Consulter un produit inexistant (404)
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/produits/999999
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 404
+}
+
+tests {
+  test("message d'erreur explicite", function () {
+    expect(res.body.status, "code dans le corps").to.equal(404);
+    expect(res.body.error, "intitulé HTTP").to.equal("Not Found");
+    expect(res.body.message, "message").to.equal("Produit introuvable avec l'id 999999");
+    expect(res.body.path, "chemin demandé").to.equal("/api/v1/produits/999999");
+  });
+}

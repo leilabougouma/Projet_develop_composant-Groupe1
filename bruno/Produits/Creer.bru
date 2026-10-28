@@ -1,0 +1,60 @@
+meta {
+  name: Créer un produit
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/produits
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "nom": "Clavier mécanique",
+    "description": "Clavier AZERTY rétroéclairé",
+    "prix": 59.90,
+    "quantite": 25,
+    "categorie": "Informatique"
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+script:post-response {
+  if (res.status === 201) {
+    bru.setVar("produitId", res.body.id);
+    bru.setVar("dateCreation", res.body.dateCreation);
+    bru.setVar("nom", res.body.nom);
+  }
+}
+
+tests {
+  test("le produit est créé avec un id et une date de création", function () {
+    expect(res.body.id, "id attribué par la base").to.be.a("number");
+    expect(res.body.dateCreation, "dateCreation posée par la base").to.be.a("string");
+  });
+
+  test("les champs envoyés sont renvoyés tels quels", function () {
+    expect(res.body.nom, "nom").to.equal("Clavier mécanique");
+    expect(res.body.description, "description").to.equal("Clavier AZERTY rétroéclairé");
+    expect(res.body.prix, "prix").to.equal(59.9);
+    expect(res.body.quantite, "quantité").to.equal(25);
+    expect(res.body.categorie, "catégorie").to.equal("Informatique");
+  });
+
+  test("l'en-tête Location pointe vers le nouveau produit", function () {
+    var location = res.getHeader("location");
+    expect(location, "en-tête Location").to.match(/\/api\/v1\/produits\/\d+$/);
+    expect(location, "Location se termine par l'id créé").to.match(new RegExp("/" + res.body.id + "$"));
+  });
+}
+
+docs {
+  Champs obligatoires : `nom` (<= 150 car.), `prix` (>= 0), `quantite` (>= 0), `categorie` (<= 100 car.). `description` est facultative.
+
+  Après l'appel, `produitId` contient l'id du produit créé (utilisé par les requêtes suivantes).
+}

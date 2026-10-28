@@ -1,0 +1,48 @@
+meta {
+  name: Créer - données invalides (400)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/produits
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "nom": "",
+    "prix": -5,
+    "quantite": -1,
+    "categorie": ""
+  }
+}
+
+assert {
+  res.status: eq 400
+}
+
+tests {
+  test("format d'erreur standard", function () {
+    expect(res.body.status, "code dans le corps").to.equal(400);
+    expect(res.body.error, "intitulé HTTP").to.equal("Bad Request");
+    expect(res.body.message, "message").to.equal("Données invalides");
+    expect(res.body.path, "chemin demandé").to.equal("/api/v1/produits");
+    expect(res.body.timestamp, "horodatage").to.be.a("string");
+  });
+
+  test("chaque champ invalide est signalé dans details", function () {
+    var champs = res.body.details.map(function (d) { return d.champ; }).sort();
+    expect(champs, "champs signalés").to.eql(["categorie", "nom", "prix", "quantite"]);
+  });
+
+  test("chaque champ invalide a un message explicite", function () {
+    var messages = {};
+    res.body.details.forEach(function (d) { messages[d.champ] = d.message; });
+    expect(messages.nom, "message du champ nom").to.equal("Le nom est obligatoire");
+    expect(messages.prix, "message du champ prix").to.equal("Le prix doit être positif ou nul");
+    expect(messages.quantite, "message du champ quantite").to.equal("La quantité doit être positive ou nulle");
+    expect(messages.categorie, "message du champ categorie").to.equal("La catégorie est obligatoire");
+  });
+}

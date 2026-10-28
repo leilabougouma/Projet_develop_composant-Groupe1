@@ -1,0 +1,57 @@
+meta {
+  name: Modifier un produit
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/api/v1/produits/{{produitId}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "nom": "Clavier mécanique (modifié)",
+    "description": "Clavier QWERTY sans fil",
+    "prix": 49.90,
+    "quantite": 10,
+    "categorie": "Informatique"
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+script:post-response {
+  if (res.status === 200) {
+    bru.setVar("nom", res.body.nom);
+  }
+}
+
+tests {
+  test("tous les champs sont remplacés", function () {
+    expect(res.body.nom, "nom").to.equal("Clavier mécanique (modifié)");
+    expect(res.body.description, "description").to.equal("Clavier QWERTY sans fil");
+    expect(res.body.prix, "prix").to.equal(49.9);
+    expect(res.body.quantite, "quantité").to.equal(10);
+    expect(res.body.categorie, "catégorie").to.equal("Informatique");
+  });
+
+  test("l'id ne change pas", function () {
+    var id = Number(bru.getVar("produitId") || bru.getEnvVar("produitId"));
+    expect(res.body.id, "id du produit modifié").to.equal(id);
+  });
+
+  test("dateCreation n'est jamais modifiée par un PUT", function () {
+    var avant = bru.getVar("dateCreation");
+    if (avant) {
+      expect(res.body.dateCreation, "dateCreation après PUT").to.equal(avant);
+    }
+  });
+}
+
+docs {
+  Remplace tous les champs du produit (même corps que la création). `dateCreation` reste inchangée.
+}

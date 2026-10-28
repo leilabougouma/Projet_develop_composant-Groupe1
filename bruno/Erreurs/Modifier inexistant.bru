@@ -1,0 +1,33 @@
+meta {
+  name: Modifier un produit inexistant (404)
+  type: http
+  seq: 6
+}
+
+put {
+  url: {{baseUrl}}/api/v1/produits/999999
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "nom": "Fantôme",
+    "description": "N'existe pas",
+    "prix": 1.00,
+    "quantite": 1,
+    "categorie": "Test"
+  }
+}
+
+assert {
+  res.status: eq 404
+}
+
+tests {
+  test("produit introuvable", function () {
+    expect(res.body.status, "code dans le corps").to.equal(404);
+    expect(res.body.message, "message").to.equal("Produit introuvable avec l'id 999999");
+    expect(res.body.path, "chemin demandé").to.equal("/api/v1/produits/999999");
+  });
+}

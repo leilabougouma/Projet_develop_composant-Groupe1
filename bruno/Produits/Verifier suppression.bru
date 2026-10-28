@@ -1,0 +1,28 @@
+meta {
+  name: Vérifier la suppression (404)
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/v1/produits/{{produitId}}
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 404
+}
+
+tests {
+  test("le produit supprimé n'existe plus", function () {
+    var id = Number(bru.getVar("produitId") || bru.getEnvVar("produitId"));
+    expect(res.body.status, "code dans le corps").to.equal(404);
+    expect(res.body.message, "message d'erreur").to.equal("Produit introuvable avec l'id " + id);
+    expect(res.body.path, "chemin demandé").to.equal("/api/v1/produits/" + id);
+  });
+}
+
+docs {
+  Dernière étape du parcours : confirme que le produit supprimé par la requête précédente a bien disparu.
+}

@@ -3,6 +3,7 @@ package com.ibam.produits.controller;
 import com.ibam.produits.dto.PageResponse;
 import com.ibam.produits.dto.ProduitRequest;
 import com.ibam.produits.dto.ProduitResponse;
+import com.ibam.produits.dto.SuppressionResponse;
 import com.ibam.produits.exception.ErrorResponse;
 import com.ibam.produits.service.ProduitService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -86,11 +87,10 @@ public class ProduitController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Supprimer un produit")
-    @ApiResponse(responseCode = "204", description = "Produit supprimé")
+    @ApiResponse(responseCode = "200", description = "Produit supprimé (message de confirmation et produit supprimé)")
     @ApiResponse(responseCode = "404", description = "Produit absent",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-    public ResponseEntity<Void> supprimer(@PathVariable Integer id) {
-        service.supprimer(id);
-        return ResponseEntity.noContent().build();
+    public SuppressionResponse supprimer(@PathVariable Integer id) {
+        return SuppressionResponse.of(service.supprimer(id));
     }
 }
