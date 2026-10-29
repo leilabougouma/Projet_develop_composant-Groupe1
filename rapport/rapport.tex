@@ -1,0 +1,1035 @@
+% =====================================================================
+% Rapport du projet « API REST de produits »
+% Compilation :  cd rapport && tectonic rapport.tex     (ou : xelatex rapport.tex, deux fois)
+% Les captures d'écran sont facultatives : déposer les images dans figures/
+% (noms attendus dans docs/GUIDE-PRESENTATION.md) ; elles apparaissent automatiquement.
+% =====================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage[export]{adjustbox}
+\usepackage[table]{xcolor}
+\usepackage{multirow}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{fancyvrb}
+\usepackage{upquote}
+\usepackage{caption}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,fit,backgrounds,shapes.misc}
+\usepackage[hidelinks]{hyperref}
+
+\setlength{\emergencystretch}{3em}
+% sommaire compact : tient sur une seule page
+\usepackage{tocloft}
+\setlength{\cftbeforesecskip}{0.45em}
+\setlength{\cftbeforesubsecskip}{0pt}
+\setlist{itemsep=2pt,topsep=4pt}
+\renewcommand{\arraystretch}{1.2}
+\captionsetup{font=small,labelfont=bf}
+
+% ---------- Couleurs et macros
+\definecolor{bleu}{HTML}{404040}
+\definecolor{gris}{HTML}{F2F2F2}
+\definecolor{vert}{HTML}{000000}
+\definecolor{rouge}{HTML}{595959}
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\aremplir}[1]{\textcolor{rouge}{\textbf{[#1]}}}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\DefineVerbatimEnvironment{Code}{Verbatim}{fontsize=\footnotesize,frame=single,framesep=2mm,rulecolor=\color{gray!60},formatcom=\color{black}}
+
+% Capture d'écran facultative : n'affiche rien si le fichier est absent
+\newcommand{\capture}[3][0.9]{%
+  \IfFileExists{figures/#2}{%
+    \begin{figure}[H]\centering
+      \includegraphics[width=#1\textwidth]{figures/#2}
+      \caption{#3}
+    \end{figure}}{}}
+
+% ---------- En-têtes
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0.3pt}
+\fancyhead[L]{\small Développement à base de composants et services web}
+\fancyhead[R]{\small Groupe~1 --- M1 IBAM 2026}
+\fancyfoot[C]{\small\thepage}
+
+% ---------- Styles TikZ
+\tikzset{
+  boite/.style={draw=bleu,fill=bleu!8,rounded corners=2pt,minimum height=1.1cm,
+                text width=2.4cm,align=center,font=\footnotesize,inner sep=3pt},
+  ext/.style={boite,draw=gray,fill=gris},
+  flux/.style={-{Stealth[length=2.2mm]},thick,color=bleu!80!black},
+  etiquette/.style={font=\scriptsize\itshape,color=black!70,midway,fill=white,inner sep=1pt}
+}
+
+\begin{document}
+
+% =====================================================================
+% PAGE DE GARDE
+% =====================================================================
+\begin{titlepage}
+\centering
+\vspace*{1cm}
+{\large Master 1 --- IBAM \hfill Année universitaire 2025--2026\par}
+\vspace{0.4cm}
+{\large Développement à base de composants et services web\par}
+\vspace{2.2cm}
+\rule{\textwidth}{0.6pt}\\[0.5cm]
+{\Huge\bfseries API REST de produits\par}
+\vspace{0.4cm}
+{\Large Bases de données, ETL Apache Hop,\\ API Spring Boot et supervision Prometheus\par}
+\rule{\textwidth}{0.6pt}\\[1.2cm]
+{\large\bfseries Rapport de projet --- Exercice 1\par}
+\vspace{2cm}
+\begin{tabular}{rl}
+  \textbf{Groupe} & 1 \\[4pt]
+  \textbf{Membres} & BOUGOUMA Leïla --- partie 1 : bases de données \\
+                   & OUARMA Landry --- partie 2 : ETL \\
+                   & WAONGO Osiris --- partie 3 : API \\
+                   & ZAPRE Malika --- partie 4 : supervision \\
+                   & KOURA Stéphane --- partie 5 : tests \\[4pt]
+  \textbf{Enseignant} & Mr Oumar KY \\[4pt]
+  \textbf{Date} & \today
+\end{tabular}
+\vfill
+{\small Code source, scripts et configuration : dépôt Git du projet (branche \code{main}).\par}
+\end{titlepage}
+
+\begin{abstract}
+\noindent
+Ce rapport présente la réalisation d'une chaîne complète de traitement de données de produits.
+Des données brutes et volontairement imparfaites, stockées dans MySQL, sont contrôlées, normalisées
+et dédoublonnées par un ETL Apache Hop, puis chargées dans PostgreSQL. Une API REST Spring Boot expose
+ces données (consultation paginée, création, modification, suppression) avec un contrat OpenAPI,
+une validation stricte et un format d'erreur unique. Prometheus supervise l'API en continu.
+L'ensemble est décrit par un seul fichier Docker Compose et se lance sur n'importe quelle machine
+disposant de Docker. Sur le jeu de test de 40 lignes, l'ETL charge 29 produits et en rejette 10 avec
+un motif précis ; l'API est couverte par 27 tests automatisés et par une collection Bruno de 18 requêtes.
+\end{abstract}
+\clearpage
+
+\tableofcontents
+\clearpage
+
+% =====================================================================
+\section{Introduction}
+% =====================================================================
+
+\subsection{Contexte et objectif}
+
+Dans une organisation, les données de produits proviennent souvent de sources hétérogènes et peu fiables :
+champs vides, prix négatifs, catégories écrites de dix façons différentes, doublons. Les exposer telles quelles
+à des applications clientes les rend inutilisables. Ce projet, réalisé dans le cadre du module
+« Développement à base de composants et services web », construit la chaîne qui permet de passer de ces
+données brutes à un service web fiable et supervisé.
+
+La chaîne comporte cinq parties, confiées chacune à un membre du groupe :
+\begin{enumerate}
+  \item les \textbf{bases de données} : une base source MySQL contenant des données sales, une base cible
+        PostgreSQL contenant des données propres, et un jeu de test de 40 lignes ;
+  \item l'\textbf{ETL} (extraction, transformation, chargement) qui alimente PostgreSQL à partir de MySQL ;
+  \item l'\textbf{API REST} Spring Boot qui expose les produits ;
+  \item la \textbf{supervision} de l'API avec Prometheus ;
+  \item les \textbf{tests} et la validation de bout en bout.
+\end{enumerate}
+
+\subsection{Principes directeurs}
+
+Trois principes ont guidé toutes les décisions techniques.
+\begin{itemize}
+  \item \textbf{Reproductibilité} : tout se lance avec Docker Compose ; aucune installation manuelle
+        d'une base de données ou d'un ETL n'est nécessaire.
+  \item \textbf{Aucun secret dans le dépôt} : les mots de passe sont lus dans un fichier \code{.env}
+        non versionné ; seul un modèle \code{.env.example} est partagé.
+  \item \textbf{Contrôle de la qualité à chaque étape} : l'ETL rejette les données invalides, la base cible
+        les refuse par des contraintes, et l'API les refuse par une validation explicite.
+\end{itemize}
+
+% =====================================================================
+\section{Architecture générale}
+% =====================================================================
+
+\subsection{Vue d'ensemble}
+
+La figure~\ref{fig:archi} montre les composants et les flux de données. Les données circulent de la gauche
+vers la droite : MySQL (source), ETL, PostgreSQL (cible), puis API. Prometheus interroge l'API à intervalle
+régulier. Tous les composants tournent dans des conteneurs Docker décrits par un unique fichier
+\code{docker-compose.yml}.
+
+\begin{figure}[H]
+\centering
+\begin{adjustbox}{max width=\textwidth}
+\begin{tikzpicture}[node distance=1.4cm]
+  \node[ext]  (mysql) {MySQL 8.0\\ base \emph{source}\\ données brutes};
+  \node[boite,right=of mysql] (etl) {ETL\\ Apache Hop 2.18.1};
+  \node[ext,right=of etl]     (pg)  {PostgreSQL 16\\ base \emph{cible}\\ données propres};
+  \node[boite,right=of pg]    (api) {API REST\\ Spring Boot 3.3\\ Java 17};
+  \node[ext,above=1.5cm of api]  (cli)  {Clients\\ Swagger UI, Bruno,\\ navigateur};
+  \node[boite,below=1.5cm of api] (prom) {Prometheus 2.53\\ supervision};
+
+  \draw[flux] (mysql) -- node[etiquette,above=2pt]{lecture} (etl);
+  \draw[flux] (etl)   -- node[etiquette,above=2pt]{écriture} (pg);
+  \draw[flux] (api)   -- node[etiquette,above=2pt]{JPA / JDBC} (pg);
+  \draw[flux] (cli)   -- node[etiquette,right=2pt]{HTTP / JSON} (api);
+  \draw[flux,dashed] (prom) -- node[etiquette,right=2pt]{collecte toutes les 5\,s} (api);
+
+  \begin{scope}[on background layer]
+    \node[draw=gray,dashed,rounded corners=4pt,fill=gray!4,inner sep=10pt,
+          fit=(mysql)(etl)(pg)(api)(cli)(prom)] (cadre) {};
+    \node[font=\scriptsize,gray,anchor=north west] at ([xshift=6pt,yshift=-5pt]cadre.north west)
+          {Docker Compose --- réseau interne};
+  \end{scope}
+\end{tikzpicture}
+\end{adjustbox}
+\caption{Architecture générale du projet.}
+\label{fig:archi}
+\end{figure}
+
+\subsection{Les services Docker}
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{|L{2.2cm}|Y|L{2.5cm}|Y|}
+\hline
+\rowcolor{bleu!15}
+\textbf{Service} & \textbf{Image} & \textbf{Port hôte} & \textbf{Rôle} \\
+\hline
+\code{mysql}      & \code{mysql:8.0}            & 3306 & Base source, initialisée par des scripts SQL \\
+\hline
+\code{postgres}   & \code{postgres:16}          & 5432 (\code{PG_PORT}) & Base cible, utilisée par l'ETL et l'API \\
+\hline
+\code{etl}        & Apache Hop 2.18.1 (image construite dans \code{etl/}) & aucun & Exécute le workflow puis s'arrête (à la demande) \\
+\hline
+\code{hop-web}    & idem                        & 8090 & Interface graphique de Hop (optionnelle) \\
+\hline
+\code{api}        & construite depuis \code{api/} & 8080 & API REST Spring Boot \\
+\hline
+\code{prometheus} & \code{prom/prometheus:v2.53.0} & 9090 & Collecte et consultation des métriques \\
+\hline
+\end{tabularx}
+\caption{Services définis dans \code{docker-compose.yml}.}
+\end{table}
+
+Plusieurs mécanismes rendent le démarrage fiable :
+\begin{itemize}
+  \item des \textbf{contrôles de santé} (\emph{healthchecks}) sur MySQL et PostgreSQL ; l'API et l'ETL n'attendent
+        que les bases soient \code{healthy} avant de démarrer (\code{depends_on} avec condition) ;
+  \item des \textbf{volumes nommés} (\code{mysql_data}, \code{pg_data}) qui conservent les données entre deux
+        arrêts ; \code{docker compose down -v} réinitialise tout ;
+  \item des \textbf{scripts d'initialisation} montés dans \code{/docker-entrypoint-initdb.d}, exécutés
+        automatiquement au premier démarrage, dans l'ordre alphabétique (\code{01-}, \code{02-}) ;
+  \item des \textbf{ports configurables} dans \code{.env}, utiles lorsqu'une machine héberge déjà une base
+        de données (voir la section~\ref{sec:difficultes}).
+\end{itemize}
+
+\subsection{Choix structurants}
+
+\begin{description}
+  \item[Le schéma est écrit en SQL, pas généré par Hibernate.] L'API démarre avec
+        \code{ddl-auto: validate} : si la table ne correspond pas au code, elle refuse de démarrer. Le même
+        script SQL sert donc de référence à l'ETL, à l'API et aux tests.
+  \item[Deux bases distinctes.] La séparation source/cible reproduit un cas réel : la source est en
+        lecture seule pour l'ETL et ne contient aucune contrainte, la cible impose toutes les règles.
+  \item[Un seul réseau Docker.] Les conteneurs se joignent par leur nom (\code{mysql}, \code{postgres},
+        \code{api}) ; seuls les ports utiles sont publiés sur la machine.
+\end{description}
+
+% =====================================================================
+\section{Partie 1 --- Bases de données et jeu de test}
+% =====================================================================
+
+\subsection{Base source MySQL}
+
+La table \code{produits_source} est créée \emph{sans aucune contrainte} (ni \code{NOT NULL}, ni
+\code{CHECK}), de façon volontaire : elle représente une source externe peu fiable. C'est à l'ETL de faire
+le contrôle qualité.
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{|l|l|p{7.5cm}|}
+\hline
+\rowcolor{bleu!15}
+\textbf{Colonne} & \textbf{Type} & \textbf{Remarque} \\
+\hline
+\code{id}            & \code{INT AUTO_INCREMENT} & Clé primaire \\
+\hline
+\code{nom}           & \code{VARCHAR(150)}       & Peut être vide ou nul \\
+\hline
+\code{description}   & \code{TEXT}               & \\
+\hline
+\code{prix}          & \code{DECIMAL(10,2)}      & Peut être négatif ou nul \\
+\hline
+\code{quantite}      & \code{INT}                & Peut être négative \\
+\hline
+\code{categorie}     & \code{VARCHAR(100)}       & Écrite de plusieurs façons (\texttt{electro}, \texttt{ÉLECTRONIQUE}\ldots) \\
+\hline
+\code{date_creation} & \code{DATETIME}           & \code{DEFAULT CURRENT_TIMESTAMP} \\
+\hline
+\end{tabular}
+\caption{Structure de la base source.}
+\end{table}
+
+La base est configurée en \code{utf8mb4} afin de stocker correctement les accents (« Électronique »,
+« Vêtements »).
+
+\subsection{Base cible PostgreSQL}
+
+La base cible contient deux tables et applique toutes les règles de gestion.
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{|L{3.1cm}|L{3.8cm}|Y|}
+\hline
+\rowcolor{bleu!15}
+\textbf{Table} & \textbf{Colonne} & \textbf{Contrainte} \\
+\hline
+\multirow{7}{*}{\code{produits}}
+  & \code{id}            & \code{SERIAL PRIMARY KEY} \\ \cline{2-3}
+  & \code{nom}           & \code{VARCHAR(150) NOT NULL} \\ \cline{2-3}
+  & \code{description}   & \code{TEXT} \\ \cline{2-3}
+  & \code{prix}          & \code{NUMERIC(10,2) NOT NULL CHECK (prix >= 0)} \\ \cline{2-3}
+  & \code{quantite}      & \code{INTEGER NOT NULL DEFAULT 0 CHECK (quantite >= 0)} \\ \cline{2-3}
+  & \code{categorie}     & \code{VARCHAR(100) NOT NULL} \\ \cline{2-3}
+  & \code{date_creation} & \code{TIMESTAMP NOT NULL DEFAULT NOW()} \\
+\hline
+\multirow{3}{*}{\code{produits_rejets}}
+  & \code{id_source}  & \code{INT} (identifiant dans MySQL) \\ \cline{2-3}
+  & \code{motif}      & \code{VARCHAR(255)} (raison du rejet) \\ \cline{2-3}
+  & \code{date_rejet} & \code{TIMESTAMP DEFAULT NOW()} \\
+\hline
+\end{tabularx}
+\caption{Structure de la base cible.}
+\end{table}
+
+Deux index accélèrent les requêtes fréquentes : un index sur \code{categorie} (filtre de l'API) et un index
+sur \code{(nom, categorie)}, qui correspond à la clé fonctionnelle utilisée par l'ETL pour détecter les
+doublons.
+
+\subsection{Jeu de test}
+\label{sec:jeu-ref}
+
+Le jeu de test insère 40 produits, construits pour exercer chaque règle de l'ETL
+(tableau~\ref{tab:jeu}). Le fichier \code{db/DONNEES-TEST.md} détaille chaque ligne et sert de référence aux
+parties ETL et tests.
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{|L{2.3cm}|Y|L{4.2cm}|}
+\hline
+\rowcolor{bleu!15}
+\textbf{Lignes} & \textbf{Contenu} & \textbf{Résultat attendu} \\
+\hline
+1 à 29     & Produits valides, catégories écrites de plusieurs façons & Chargées dans \code{produits} \\
+\hline
+30         & Doublon de la ligne 7 (\emph{Souris sans fil}, Informatique) & Mise à jour de la ligne existante \\
+\hline
+31 à 38, 40 & Nom, prix, quantité ou catégorie manquant ou invalide & Rejetées avec un motif \\
+\hline
+39         & Catégorie inconnue (\texttt{jouets}) & Rejetée (décision du groupe) \\
+\hline
+\end{tabularx}
+\caption{Répartition des 40 lignes de test.}
+\label{tab:jeu}
+\end{table}
+
+Le jeu contient aussi des cas limites \emph{valides} qu'il ne faut pas rejeter : une quantité égale à zéro
+(ligne~21) et un prix égal à zéro (ligne~27).
+
+Le script \code{db/verifier-bases.sh} contrôle que les deux bases répondent et affiche le nombre de lignes
+(40 dans la source ; les tables cibles sont vides avant le premier passage de l'ETL).
+
+% =====================================================================
+\section{Partie 2 --- ETL avec Apache Hop}
+% =====================================================================
+
+\subsection{Choix de l'outil}
+
+L'énoncé proposait Talend Open Studio. Cet outil n'est plus maintenu depuis 2024 et son installation
+n'est plus fiable ; l'énoncé autorisant une autre solution ETL, le groupe a retenu \textbf{Apache Hop 2.18.1}
+pour trois raisons : c'est un projet libre et actif de la fondation Apache (issu de Pentaho Kettle) ; ses
+traitements sont enregistrés en XML et donc versionnables avec Git ; il fournit une image Docker officielle,
+ce qui rend l'exécution reproductible.
+
+\subsection{Le pipeline de traitement}
+
+Le pipeline \code{pl_produits} traite chaque ligne en cinq étapes (figure~\ref{fig:etl}).
+
+\begin{figure}[H]
+\centering
+\begin{adjustbox}{max width=\textwidth}
+\begin{tikzpicture}[node distance=0.4cm,boite/.append style={text width=2.35cm,minimum height=1.5cm}]
+  \node[ext]  (a) {1.~Extraction\\ \texttt{produits\_\allowbreak source}};
+  \node[boite,right=of a] (b) {2.~Normalisation\\ trim, minuscules, sans accents};
+  \node[boite,right=of b] (c) {3.~Correspondance\\ référentiel de catégories};
+  \node[boite,right=of c] (d) {4.~Contrôle\\ règles de gestion};
+  \node[ext,right=of d]   (e) {5.~Chargement\\ \texttt{produits}};
+  \node[ext,below=1.1cm of d] (r) {\texttt{produits\_\allowbreak rejets}\\ avec motif};
+  \draw[flux] (a)--(b); \draw[flux] (b)--(c); \draw[flux] (c)--(d);
+  \draw[flux] (d)--node[etiquette,above=2pt]{valide}(e);
+  \draw[flux,color=rouge] (d)--node[etiquette,right=2pt]{invalide}(r);
+\end{tikzpicture}
+\end{adjustbox}
+\caption{Étapes du pipeline ETL.}
+\label{fig:etl}
+\end{figure}
+
+\begin{enumerate}
+  \item \textbf{Extraction} : lecture de la table \code{produits_source} dans MySQL.
+  \item \textbf{Normalisation} : suppression des espaces superflus dans le nom ; mise en minuscules de la
+        catégorie, suppression des espaces et des accents (« ÉLECTRONIQUE » devient « electronique »).
+  \item \textbf{Correspondance} : recherche de la catégorie officielle dans le référentiel
+        \code{categories.csv} (« electro » devient « Electronique »). Il y a cinq catégories officielles :
+        Electronique, Informatique, Vetements, Alimentation et Maison.
+  \item \textbf{Contrôle} : le nom, le prix et la catégorie sont obligatoires ; le prix et la quantité doivent
+        être positifs ou nuls ; la catégorie doit être connue. Chaque ligne invalide reçoit un motif précis
+        (par exemple « prix négatif » ou « catégorie inconnue (jouets) »).
+  \item \textbf{Chargement} : les lignes valides sont insérées dans \code{produits}, ou mises à jour si un
+        produit de même nom et de même catégorie existe déjà, ce qui évite les doublons. Les lignes
+        invalides sont écrites dans \code{produits_rejets}.
+\end{enumerate}
+
+\subsection{Le workflow d'orchestration}
+
+Le workflow \code{wf_etl_produits} enchaîne la vérification des connexions, l'exécution du pipeline, le calcul
+d'un bilan (pipeline \code{pl_bilan}) puis la journalisation. En cas d'erreur, il écrit un message d'échec et
+se termine avec un code de sortie non nul : l'ETL peut ainsi être intégré à un test automatique.
+
+\subsection{Exécution et résultats}
+
+\begin{Code}
+docker compose up -d            # démarre les bases
+docker compose run --rm etl     # exécute le workflow puis s'arrête
+\end{Code}
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{|l|r|}
+\hline
+\rowcolor{bleu!15}
+\textbf{Indicateur} & \textbf{Valeur} \\
+\hline
+Lignes lues dans MySQL & 40 \\
+\hline
+Lignes valides & 30 \\
+\hline
+Produits chargés dans PostgreSQL & 29 \\
+\hline
+Lignes rejetées & 10 \\
+\hline
+\end{tabular}
+\caption{Résultats de l'ETL sur le jeu de test (source : rapport de la partie ETL, \code{etl/RAPPORT-ETL.md}).}
+\end{table}
+
+Les 10 lignes rejetées portent chacune un motif précis, relevé dans la table \code{produits_rejets} :
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{|L{2.2cm}|Y|}
+\hline
+\rowcolor{bleu!15}
+\textbf{Ligne source} & \textbf{Motif de rejet} \\
+\hline
+31, 32, 33 & nom manquant (valeur nulle, vide, ou espaces uniquement) \\
+\hline
+34 & prix manquant \\
+\hline
+35 & prix négatif \\
+\hline
+36 & quantité négative \\
+\hline
+37, 38 & catégorie manquante (valeur nulle ou vide) \\
+\hline
+39 & catégorie inconnue (jouets) \\
+\hline
+40 & nom manquant, prix manquant \\
+\hline
+\end{tabularx}
+\caption{Motifs de rejet observés après exécution de l'ETL.}
+\end{table}
+
+L'écart entre 30 lignes valides et 29 produits chargés s'explique par le doublon : la ligne~30 met à jour
+« Souris sans fil » au lieu de créer une nouvelle ligne. La catégorie « jouets », absente du référentiel,
+est rejetée. Une seconde exécution donne les mêmes chiffres : l'ETL est \emph{idempotent}, car la table
+des rejets est vidée à chaque passage et le chargement fonctionne par insertion ou mise à jour.
+
+Les identifiants des bases ne sont écrits dans aucun fichier Hop : les connexions utilisent des variables
+(\code{${MYSQL_PASSWORD}}, \code{${PG_PASSWORD}}\ldots) fournies par \code{.env} au démarrage du conteneur.
+
+\capture{hop-pipeline.png}{Le pipeline \texttt{pl\_produits} dans l'interface Hop Web.}
+
+% =====================================================================
+\section{Partie 3 --- API REST Spring Boot}
+% =====================================================================
+
+\subsection{Technologies}
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{|L{4.2cm}|Y|}
+\hline
+\rowcolor{bleu!15}
+\textbf{Élément} & \textbf{Choix} \\
+\hline
+Langage et framework & Java 17, Spring Boot 3.3.5 \\
+\hline
+Accès aux données & Spring Data JPA, Hibernate, pilote PostgreSQL \\
+\hline
+Validation & Jakarta Bean Validation (\code{@Valid}, \code{@NotBlank}, \code{@PositiveOrZero}\ldots) \\
+\hline
+Documentation & springdoc-openapi 2.6.0 (contrat OpenAPI et Swagger UI) \\
+\hline
+Supervision & Spring Boot Actuator et Micrometer (registre Prometheus) \\
+\hline
+Confort de code & Lombok (accesseurs, constructeurs) \\
+\hline
+Tests & JUnit 5, Mockito, MockMvc, base H2 en mode PostgreSQL \\
+\hline
+\end{tabularx}
+\caption{Pile technique de l'API.}
+\end{table}
+
+\subsection{Architecture en couches}
+
+Le code suit une architecture en couches classique (figure~\ref{fig:couches}), chaque couche n'appelant
+que la suivante.
+
+\begin{figure}[H]
+\centering
+\begin{adjustbox}{max width=\textwidth}
+\begin{tikzpicture}[node distance=0.55cm,boite/.append style={text width=2.3cm,minimum height=1.3cm}]
+  \node[ext]  (cl) {Client HTTP};
+  \node[boite,right=of cl] (co) {Controller\\ routes, statuts HTTP};
+  \node[boite,right=of co] (se) {Service\\ règles métier, transactions};
+  \node[boite,right=of se] (re) {Repository\\ Spring Data JPA};
+  \node[ext,right=of re]   (db) {PostgreSQL};
+  \draw[flux,<->] (cl)--(co); \draw[flux,<->] (co)--(se);
+  \draw[flux,<->] (se)--(re); \draw[flux,<->] (re)--(db);
+  \node[boite,below=0.9cm of se,text width=9.4cm,fill=rouge!6,draw=rouge!70]
+        (ex) {\texttt{GlobalExceptionHandler} : toutes les erreurs (validation, introuvable, JSON mal formé,
+              route inconnue) sont converties en un même format JSON};
+  \draw[dashed,color=rouge!70,-{Stealth[length=2mm]}] (co.south) -- (co.south |- ex.north);
+\end{tikzpicture}
+\end{adjustbox}
+\caption{Couches de l'API.}
+\label{fig:couches}
+\end{figure}
+
+\begin{description}
+  \item[\code{entity}] La classe \code{Produit} est liée à la table \code{produits}. Le champ
+        \code{dateCreation} est posé par la base (\code{DEFAULT NOW()}) et relu après l'insertion ; l'API ne
+        l'écrit jamais, ce qui garantit qu'un \code{PUT} ne peut pas la modifier.
+  \item[\code{dto}] Des objets de transfert séparent le contrat de l'API du modèle de données :
+        \code{ProduitRequest} (entrée, avec les règles de validation), \code{ProduitResponse} (sortie),
+        \code{PageResponse} (résultat paginé) et \code{SuppressionResponse} (confirmation de suppression).
+        Ce sont des \emph{records} Java, donc immuables.
+  \item[\code{repository}] Interface Spring Data ; elle ajoute la recherche par catégorie sans tenir compte
+        de la casse.
+  \item[\code{service}] Contient la logique et les transactions : lecture seule par défaut, écriture
+        explicite pour la création, la modification et la suppression.
+  \item[\code{controller}] Déclare les routes sous \code{/api/v1/produits} et documente chaque réponse pour
+        OpenAPI. La route \code{/} redirige vers Swagger UI.
+  \item[\code{exception}] Un gestionnaire centralisé (\code{@RestControllerAdvice}) produit toutes les
+        réponses d'erreur.
+\end{description}
+
+\subsection{Les endpoints}
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{|L{2.5cm}|L{1.7cm}|L{4.2cm}|Y|}
+\hline
+\rowcolor{bleu!15}
+\textbf{Opération} & \textbf{Méthode} & \textbf{URL} & \textbf{Réponses} \\
+\hline
+Lister       & GET    & \code{/api/v1/produits} & 200 ; 400 si \code{page} < 0 ou \code{size} hors de 1 à 100 \\
+\hline
+Consulter    & GET    & \code{/api/v1/produits/{id}} & 200 ; 404 \\
+\hline
+Créer        & POST   & \code{/api/v1/produits} & 201 avec l'en-tête \code{Location} ; 400 \\
+\hline
+Modifier     & PUT    & \code{/api/v1/produits/{id}} & 200 ; 400 ; 404 \\
+\hline
+Supprimer    & DELETE & \code{/api/v1/produits/{id}} & 200 avec message de confirmation ; 404 \\
+\hline
+\end{tabularx}
+\caption{Ressource \code{produits}.}
+\end{table}
+
+La liste accepte les paramètres \code{categorie} (filtre, casse ignorée), \code{page} (défaut 0) et
+\code{size} (défaut 20, maximum 100). Les résultats sont triés par identifiant et renvoyés sous la forme
+\texttt{\{content, page, size, totalElements, totalPages\}}.
+
+Trois endpoints techniques complètent l'API : \code{/actuator/health} (état de l'application),
+\code{/actuator/prometheus} (métriques) et \code{/v3/api-docs} (contrat OpenAPI).
+
+\subsection{Validation et gestion des erreurs}
+
+Les règles de validation sont portées par \code{ProduitRequest} : le nom est obligatoire et limité à
+150 caractères ; le prix est obligatoire, positif ou nul, avec au plus deux décimales ; la quantité est
+obligatoire, positive ou nulle ; la catégorie est obligatoire et limitée à 100 caractères. Les paramètres
+de pagination sont validés de la même façon.
+
+Toutes les erreurs ont le \textbf{même format JSON}, y compris pour une route inconnue ou un corps JSON
+mal formé, ce qui simplifie le travail des applications clientes :
+
+\begin{Code}
+{"timestamp":"2026-10-28T15:36:52Z","status":400,"error":"Bad Request",
+ "message":"Données invalides","path":"/api/v1/produits",
+ "details":[{"champ":"prix","message":"Le prix doit être positif ou nul"}]}
+\end{Code}
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{|L{5.6cm}|L{1.2cm}|Y|}
+\hline
+\rowcolor{bleu!15}
+\textbf{Cause} & \textbf{Statut} & \textbf{Message} \\
+\hline
+Corps invalide (champ vide, prix négatif\ldots) & 400 & « Données invalides » + liste \code{details} \\
+\hline
+Paramètre de pagination hors limites            & 400 & « Paramètres invalides » + \code{details} \\
+\hline
+Identifiant non numérique (\code{/produits/abc}) & 400 & « Valeur invalide pour le paramètre 'id' » \\
+\hline
+Corps JSON absent ou mal formé                  & 400 & « Corps de requête JSON absent ou mal formé » \\
+\hline
+Produit inexistant                              & 404 & « Produit introuvable avec l'id \ldots » \\
+\hline
+Route inconnue                                  & 404 & « Ressource introuvable : \ldots » \\
+\hline
+\end{tabularx}
+\caption{Erreurs gérées par \code{GlobalExceptionHandler}.}
+\end{table}
+
+\subsection{Contrat OpenAPI}
+
+Le contrat est généré automatiquement par springdoc à partir du code puis \emph{exporté dans le dépôt}
+(\code{api/openapi.yaml}) par un test dédié. Le contrat versionné permet de voir en une revue de code ce
+qu'un changement modifie pour les clients. La documentation interactive est disponible sur
+\code{/swagger-ui/index.html}.
+
+\capture{swagger-ui.png}{Documentation interactive de l'API (Swagger UI).}
+
+\subsection{Deux améliorations apportées aux réponses}
+
+Après une première version, deux réponses jugées trop pauvres ont été enrichies.
+
+\begin{itemize}
+  \item \textbf{La suppression} renvoyait un \code{204} sans corps. Elle renvoie désormais un \code{200}
+        avec un message de confirmation et le produit tel qu'il était avant suppression :
+\begin{Code}
+{"message":"Produit 11 supprimé",
+ "produit":{"id":11,"nom":"Souris","prix":19.90,"quantite":40,
+            "categorie":"Informatique","dateCreation":"2026-10-28T15:36:52"}}
+\end{Code}
+        Ce changement modifie le contrat (le statut passe de 204 à 200) ; les tests, le contrat OpenAPI,
+        le README et la collection Bruno ont été mis à jour en conséquence.
+  \item \textbf{L'état de santé} (\code{/actuator/health}) ne renvoyait que \texttt{\{"status":"UP"\}}. Avec
+        \code{show-details: always}, il détaille chaque composant : base PostgreSQL, espace disque libre et
+        \emph{ping}. Un incident de base de données devient visible sans consulter les journaux.
+\end{itemize}
+
+\subsection{Conteneurisation}
+
+Le \code{Dockerfile} de l'API a deux étapes : une image Maven compile l'application, puis seule l'archive
+\code{.jar} est copiée dans une image \emph{JRE 17} légère, exécutée par un utilisateur non privilégié. Les
+dépendances sont téléchargées dans une couche séparée, ce qui accélère les reconstructions.
+
+% =====================================================================
+\section{Partie 4 --- Supervision avec Prometheus}
+% =====================================================================
+
+\subsection{Principe}
+
+L'API expose ses métriques au format Prometheus sur \code{/actuator/prometheus}, grâce à Actuator et
+Micrometer. Le serveur Prometheus les \emph{collecte} (\emph{scrape}) toutes les 5~secondes, les stocke
+et permet de les interroger avec le langage PromQL, sur \code{http://localhost:9090}.
+
+\begin{Code}
+global:
+  scrape_interval: 5s
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["prometheus:9090"]
+  - job_name: "produits-api"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["api:8080"]
+\end{Code}
+
+La cible de l'API est désignée par son nom de service Docker (\code{api:8080}) : la configuration est donc
+identique sur toutes les machines. Dans l'interface de Prometheus (page \emph{Status~>~Targets}), les deux
+cibles apparaissent à l'état \code{UP}.
+
+\subsection{Métriques disponibles}
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{|L{6.4cm}|Y|}
+\hline
+\rowcolor{bleu!15}
+\textbf{Métrique} & \textbf{Information} \\
+\hline
+\code{http_server_requests_seconds_*} & Nombre et durée des requêtes, par méthode, URI, statut et résultat \\
+\hline
+\code{jvm_memory_used_bytes}          & Mémoire utilisée (tas et hors-tas) \\
+\hline
+\code{hikaricp_connections_*}         & Connexions actives et en attente vers PostgreSQL \\
+\hline
+\code{process_cpu_usage}              & Utilisation du processeur \\
+\hline
+\code{up}                             & 1 si la cible répond à la collecte, 0 sinon \\
+\hline
+\end{tabularx}
+\caption{Principales familles de métriques.}
+\end{table}
+
+\subsection{Requêtes PromQL utiles}
+
+\begin{Code}
+up                                                    # état de chaque cible
+sum by (uri) (rate(http_server_requests_seconds_count{uri=~"/api/.*"}[5m]))
+                                                      # requêtes par seconde et par route
+sum by (status) (http_server_requests_seconds_count{uri=~"/api/.*"})
+                                                      # nombre de réponses par code HTTP
+sum by (area) (jvm_memory_used_bytes)                 # mémoire de la JVM
+hikaricp_connections_active                           # connexions actives à la base
+\end{Code}
+
+Ces requêtes ont été exécutées sur l'environnement du projet et renvoient des séries de données.
+Elles permettent par exemple de repérer une hausse des erreurs 4xx/5xx ou une saturation de la mémoire.
+
+\capture{prometheus-targets.png}{Cibles de collecte dans Prometheus.}
+\capture{prometheus-requetes.png}{Requête PromQL sur le trafic de l'API.}
+
+% =====================================================================
+\section{Partie 5 --- Tests et validation}
+% =====================================================================
+
+La qualité est vérifiée à quatre niveaux, du plus fin au plus global.
+
+\subsection{Tests unitaires du service}
+
+Neuf tests JUnit~5 isolent la couche service en simulant le repository avec Mockito. Ils vérifient la
+création (avec normalisation des espaces), la modification, la suppression (y compris la valeur
+renvoyée), la liste avec ou sans filtre de catégorie, et le déclenchement de
+\code{ProduitNotFoundException} quand un produit est absent.
+
+\subsection{Tests d'intégration de l'API}
+
+Dix-huit tests parcourent l'application de bout en bout --- contrôleur, validation, service, JPA --- avec
+MockMvc et une base H2 configurée en mode PostgreSQL. Le schéma de test
+(\code{src/test/resources/schema-test.sql}) reproduit celui de PostgreSQL, y compris les contraintes
+\code{CHECK}. Les cas couverts sont notamment :
+\begin{itemize}
+  \item création valide (201, en-tête \code{Location}, date de création posée) ;
+  \item création invalide (400, champs signalés), prix manquant et JSON mal formé ;
+  \item modification, dont la conservation de la date de création, et modification invalide ;
+  \item suppression (200 avec confirmation), puis disparition du produit (404) ;
+  \item consultation d'un produit absent (404) et identifiant non numérique (400) ;
+  \item pagination, filtre de catégorie, paramètres de pagination hors limites ;
+  \item route inconnue (404 au format JSON), redirection de la racine vers Swagger, exposition du contrat
+        OpenAPI et de l'état de santé.
+\end{itemize}
+Ces 27 tests (9 + 18) s'exécutent sans Docker avec \code{mvn test} ; ils réussissent tous. Un 28\textsuperscript{e}
+test, qui exporte le contrat OpenAPI, est désactivé par défaut et se lance avec
+\code{-Dopenapi.export=true}. Le projet cible Java~17 : avec une version plus récente (par exemple Java~27),
+la compilation échoue à cause de Lombok.
+
+\subsection{Collection Bruno}
+
+La collection du dossier \code{bruno/} teste l'API réelle, en marche, par HTTP. Elle contient
+\textbf{18 requêtes} en trois dossiers, chacune avec des assertions et des tests aux messages explicites.
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{|L{2.6cm}|L{1.9cm}|Y|}
+\hline
+\rowcolor{bleu!15}
+\textbf{Dossier} & \textbf{Requêtes} & \textbf{Contenu} \\
+\hline
+Produits    & 7 & Lister, lister par catégorie, créer, consulter, modifier, supprimer, vérifier la suppression \\
+\hline
+Erreurs     & 8 & Données invalides (création et modification), pagination invalide, identifiant non numérique, produit inexistant (consulter, modifier, supprimer), route inconnue \\
+\hline
+Supervision & 3 & Santé détaillée, métriques Prometheus, contrat OpenAPI \\
+\hline
+\end{tabularx}
+\caption{Organisation de la collection Bruno.}
+\end{table}
+
+Le dossier \emph{Produits} forme un scénario : la requête de création mémorise l'identifiant du produit dans
+une variable, que les requêtes suivantes réutilisent. Le parcours complet crée puis supprime un produit,
+et laisse donc la base dans son état initial. La collection s'ouvre dans Bruno par \emph{Open Collection},
+avec l'environnement \emph{Local} (\code{baseUrl = http://localhost:8080}).
+
+\capture{bruno-runner.png}{Exécution de la collection Bruno avec le Runner.}
+
+\subsection{Test de bout en bout}
+
+Le test de bout en bout vérifie que toute la chaîne fonctionne ensemble, depuis une machine vierge.
+Le scénario est le suivant ; les valeurs attendues proviennent du jeu de test (section~\ref{sec:jeu-ref}).
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{|L{0.8cm}|L{7.4cm}|Y|}
+\hline
+\rowcolor{bleu!15}
+\textbf{N°} & \textbf{Action} & \textbf{Résultat attendu} \\
+\hline
+1 & \code{docker compose down -v} puis \code{docker compose up -d --build} & 4 services démarrés ; MySQL et PostgreSQL \code{healthy} \\
+\hline
+2 & \code{bash db/verifier-bases.sh} & 40 lignes dans MySQL ; \code{produits} et \code{produits_rejets} vides \\
+\hline
+3 & \code{docker compose run --rm etl} & Code de sortie 0 ; 40 lues, 29 chargées, 10 rejetées \\
+\hline
+4 & \code{GET /api/v1/produits?size=100} & \code{totalElements = 29} \\
+\hline
+5 & \code{GET /api/v1/produits?categorie=informatique} & Uniquement des produits « Informatique », quelle que soit la casse demandée \\
+\hline
+6 & Dossier \emph{Produits} de Bruno & Création, lecture, modification, suppression, puis 404 \\
+\hline
+7 & Dossier \emph{Erreurs} de Bruno & Tous les cas d'erreur renvoient le format JSON standard \\
+\hline
+8 & Page \emph{Targets} de Prometheus & Cible \code{produits-api} à l'état \code{UP} ; compteurs des requêtes en hausse \\
+\hline
+9 & Second passage de l'ETL & Mêmes chiffres (29 produits), sans doublon \\
+\hline
+\end{tabularx}
+\caption{Scénario de bout en bout et résultats attendus.}
+\end{table}
+
+\paragraph{Résultats observés.} Le scénario a été exécuté le 28 octobre 2026 sur une machine neuve côté
+Docker (volumes supprimés par \code{docker compose down -v}). Les 9 étapes réussissent (tableau~\ref{tab:resultats}).
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{|L{0.8cm}|Y|L{1.5cm}|}
+\hline
+\rowcolor{bleu!15}
+\textbf{N°} & \textbf{Résultat observé} & \textbf{Statut} \\
+\hline
+1 & Les 4 services permanents démarrent en une vingtaine de secondes ; MySQL et PostgreSQL sont \code{healthy} après environ 9\,s ; l'API répond \code{UP}. & \textbf{OK} \\
+\hline
+2 & MySQL contient 40 lignes ; \code{produits} et \code{produits_rejets} sont vides ; l'API renvoie \code{totalElements = 0}. & \textbf{OK} \\
+\hline
+3 & Code de sortie 0. Journal : 40 lignes lues, 29 produits chargés, 10 rejetées. Le workflow dure 1,6\,s ; la commande complète 1\,min\,23\,s à la première exécution (construction de l'image Hop comprise). & \textbf{OK} \\
+\hline
+4 & \code{totalElements = 29}, produits triés par identifiant croissant. & \textbf{OK} \\
+\hline
+5 & Le filtre renvoie 6 produits « Informatique » pour \code{informatique}, \code{INFORMATIQUE} et \code{Informatique}. Répartition des 29 produits : Alimentation~5, Electronique~7, Informatique~6, Maison~5, Vetements~6 ; aucun produit « jouets ». & \textbf{OK} \\
+\hline
+6 & Parcours création, lecture, modification, suppression : 201 avec \code{Location}, 200, 200 (\code{dateCreation} inchangée), 200 avec message « Produit 31 supprimé », puis 404 ; la base retrouve ses 29 produits. 9 vérifications. & \textbf{OK} \\
+\hline
+7 & Les 8 cas d'erreur renvoient le statut attendu (400 ou 404) et le format JSON standard. 8 vérifications. & \textbf{OK} \\
+\hline
+8 & Cibles \code{produits-api} et \code{prometheus} à l'état \code{UP} ; le compteur des requêtes sur \code{/api} passe de 29 à 31 après deux requêtes supplémentaires. & \textbf{OK} \\
+\hline
+9 & Code de sortie 0 ; mêmes chiffres (40, 29, 10) ; l'API liste toujours 29 produits, soit 29 couples (nom, catégorie) distincts : aucun doublon. Commande complète : 18\,s. & \textbf{OK} \\
+\hline
+\end{tabularx}
+\caption{Résultats du scénario de bout en bout (28 vérifications automatisées sur les étapes 4 à 7 et la supervision, 0 échec).}
+\label{tab:resultats}
+\end{table}
+
+Les étapes 4 à 7 ont été rejouées par un script qui envoie les mêmes requêtes et applique les mêmes
+vérifications que la collection Bruno (dossiers \emph{Produits}, \emph{Erreurs} et \emph{Supervision}) ;
+l'exécution dans l'application Bruno elle-même fait l'objet de la capture \texttt{bruno-runner.png}.
+
+% =====================================================================
+\section{Difficultés rencontrées et solutions}
+\label{sec:difficultes}
+% =====================================================================
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{|L{4.2cm}|Y|}
+\hline
+\rowcolor{bleu!15}
+\textbf{Difficulté} & \textbf{Solution} \\
+\hline
+Talend Open Studio n'est plus maintenu (2024) &
+  Choix d'Apache Hop, documenté et justifié, conforme à l'énoncé qui autorise une alternative \\
+\hline
+Apache Hop ne fournit pas le pilote MySQL (licence) &
+  Pilote ajouté automatiquement à la construction de l'image Docker \\
+\hline
+Aucun composant Hop ne supprime les accents &
+  Court script JavaScript intégré au pipeline \\
+\hline
+L'image officielle de Hop affichait les mots de passe dans son journal &
+  Identifiants transmis par un fichier temporaire créé au démarrage du conteneur \\
+\hline
+Ports déjà occupés sur certaines machines (PostgreSQL local sur 5432, autre conteneur sur 5433) &
+  Ports publiés configurables dans \code{.env} (\code{PG_PORT}) ; l'API, dans Docker, joint toujours \code{postgres:5432} en interne \\
+\hline
+Compilation Maven en échec avec Java~27 (Lombok incompatible) &
+  Utilisation du JDK~17 visé par le projet ; l'image Docker n'est pas concernée \\
+\hline
+Réponses de l'API jugées trop pauvres (suppression sans corps, santé réduite à \texttt{UP}) &
+  Suppression avec confirmation et santé détaillée, tests et contrat mis à jour \\
+\hline
+\end{tabularx}
+\caption{Principales difficultés et réponses apportées.}
+\end{table}
+
+% =====================================================================
+\section{Organisation du travail}
+% =====================================================================
+
+Le travail a été réparti en cinq parties, une par membre. Le dépôt Git applique un flux simple : une
+branche par fonctionnalité (\code{feat/*}), intégrée dans \code{main} par une demande de fusion
+(\emph{pull request}).
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{|L{1.1cm}|L{2.6cm}|Y|L{5.0cm}|}
+\hline
+\rowcolor{bleu!15}
+\textbf{Partie} & \textbf{Membre} & \textbf{Réalisations} & \textbf{Branche Git} \\
+\hline
+1 & BOUGOUMA Leïla & Scripts SQL des deux bases, jeu de test de 40 lignes (\code{DONNEES-TEST.md}), \code{docker-compose.yml}, \code{.env.example}, script \code{verifier-bases.sh} & \code{main} (commit initial) \\
+\hline
+2 & OUARMA Landry & Projet Apache Hop (pipelines \code{pl_produits} et \code{pl_bilan}, workflow \code{wf_etl_produits}), référentiel de catégories, services Docker \code{etl} et \code{hop-web}, installation et rapport de l'ETL & \code{feat/etl-hop} (PR~\#3) \\
+\hline
+3 & WAONGO Osiris & API Spring Boot en couches, validation, gestion centralisée des erreurs, contrat OpenAPI, \code{Dockerfile}, tests unitaires et d'intégration & \code{feat/api-dev} (PR~\#2) \\
+\hline
+4 & ZAPRE Malika & Fichier \code{prometheus.yml}, service Prometheus dans Docker Compose, exposition des métriques de l'API & \code{feat/monitoring-prometheus} (PR~\#1) \\
+\hline
+5 & KOURA Stéphane & Collection Bruno (18 requêtes), enrichissement des réponses de l'API (suppression, santé détaillée), scénario de bout en bout, rapport LaTeX et guide de présentation & \code{feat/tests} (PR~\#4) \\
+\hline
+\end{tabularx}
+\caption{Répartition des parties.}
+\end{table}
+
+% =====================================================================
+\section{Limites et perspectives}
+% =====================================================================
+
+\begin{itemize}
+  \item \textbf{Sécurité} : l'API n'a pas d'authentification, et l'état de santé détaillé est public. C'est
+        acceptable pour un environnement de développement ; en production, il faudrait ajouter Spring
+        Security (jetons JWT) et limiter l'accès aux endpoints \code{/actuator}.
+  \item \textbf{ETL automatique} : l'ETL se lance à la demande. Il pourrait être planifié (tâche
+        périodique) ou déclenché à l'arrivée de nouvelles données.
+  \item \textbf{Supervision} : ajouter des règles d'alerte (taux d'erreurs, indisponibilité) avec
+        Alertmanager, et des tableaux de bord Grafana.
+  \item \textbf{Tests} : utiliser Testcontainers pour tester l'API contre un vrai PostgreSQL plutôt que H2,
+        et automatiser le scénario de bout en bout dans une chaîne d'intégration continue.
+  \item \textbf{Évolution de l'API} : versionnement déjà prévu par le préfixe \code{/api/v1} ; ajout possible
+        de la recherche par nom, du tri configurable et de la suppression logique.
+\end{itemize}
+
+% =====================================================================
+\section{Conclusion}
+% =====================================================================
+
+Le projet atteint son objectif : une chaîne complète, reproductible et vérifiée, qui transforme des données
+brutes et imparfaites en un service web fiable et supervisé. L'ETL garantit la qualité des données, la base
+cible la protège par des contraintes, l'API l'expose avec un contrat clair et des erreurs homogènes, et
+Prometheus permet de suivre son comportement. La combinaison de Docker Compose, d'un contrat OpenAPI
+versionné, de 27 tests automatisés et d'une collection Bruno rend le projet facile à lancer, à relire et à
+faire évoluer. Le travail en groupe, avec des parties indépendantes reliées par des conventions communes
+(schéma SQL, variables d'environnement, ports), a permis d'avancer en parallèle sans blocage.
+
+\appendix
+% =====================================================================
+\section{Lancer le projet}
+% =====================================================================
+
+\begin{Code}
+# 1. Configuration (changer PG_PORT si le port 5432 est déjà pris)
+cp .env.example .env
+
+# 2. Démarrer MySQL, PostgreSQL, l'API et Prometheus
+docker compose up -d --build
+docker compose ps                      # attendre "healthy"
+
+# 3. Charger les données propres dans PostgreSQL
+docker compose run --rm etl
+
+# 4. Vérifier
+curl http://localhost:8080/actuator/health
+curl "http://localhost:8080/api/v1/produits?size=100"
+\end{Code}
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{|L{8.9cm}|Y|}
+\hline
+\rowcolor{bleu!15}
+\textbf{Adresse} & \textbf{Contenu} \\
+\hline
+\code{http://localhost:8080/swagger-ui/index.html} & Documentation interactive de l'API \\
+\hline
+\code{http://localhost:8080/actuator/health}      & État de l'application et de ses composants \\
+\hline
+\code{http://localhost:9090}                      & Prometheus \\
+\hline
+\code{http://localhost:8090/ui}                   & Hop Web (profil \code{hop-web}) \\
+\hline
+\end{tabularx}
+\caption{Adresses utiles.}
+\end{table}
+
+% =====================================================================
+\section{Structure du dépôt}
+% =====================================================================
+
+\begin{Code}
+.
+|-- docker-compose.yml      services : mysql, postgres, etl, hop-web, api, prometheus
+|-- .env.example            modèle de configuration (le .env n'est pas versionné)
+|-- db/                     scripts SQL des deux bases, jeu de test, verifier-bases.sh
+|-- etl/                    projet Apache Hop, référentiel de catégories, Dockerfile
+|-- api/                    API Spring Boot : src/, pom.xml, Dockerfile, openapi.yaml
+|-- monitoring/             prometheus.yml
+|-- bruno/                  collection Bruno (18 requêtes)
+|-- rapport/                ce rapport (LaTeX)
+`-- docs/                   guide de préparation de la présentation
+\end{Code}
+
+\section{Exemples de requêtes et de réponses}
+
+\paragraph{Créer un produit.}
+\begin{Code}
+curl -X POST http://localhost:8080/api/v1/produits \
+  -H 'Content-Type: application/json' \
+  -d '{"nom":"Clavier","description":"AZERTY","prix":59.90,
+       "quantite":25,"categorie":"Informatique"}'
+
+HTTP/1.1 201
+Location: http://localhost:8080/api/v1/produits/12
+{"id":12,"nom":"Clavier","description":"AZERTY","prix":59.90,"quantite":25,
+ "categorie":"Informatique","dateCreation":"2026-10-28T15:36:52.77"}
+\end{Code}
+
+\paragraph{Lister avec filtre et pagination.}
+\begin{Code}
+GET /api/v1/produits?categorie=informatique&page=0&size=2
+
+{"content":[ {...}, {...} ],"page":0,"size":2,"totalElements":7,"totalPages":4}
+\end{Code}
+
+\paragraph{Produit inexistant.}
+\begin{Code}
+GET /api/v1/produits/999999            ->  404
+
+{"timestamp":"2026-10-28T15:36:52Z","status":404,"error":"Not Found",
+ "message":"Produit introuvable avec l'id 999999",
+ "path":"/api/v1/produits/999999"}
+\end{Code}
+
+\end{document}
