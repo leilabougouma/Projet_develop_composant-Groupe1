@@ -311,6 +311,7 @@ Le test de bout en bout rejoue toute la chaîne : 40 lignes dans MySQL, ETL (29 
 ## Rapport et présentation
 
 - `rapport/rapport.tex` : rapport du projet en LaTeX (`cd rapport && tectonic rapport.tex` produit `rapport.pdf`). Les captures d'écran facultatives se déposent dans `rapport/figures/`.
+- `presentation/Presentation-API-Produits.pptx` : présentation PowerPoint (16 diapositives, notes de l'orateur incluses).
 - `docs/GUIDE-PRESENTATION.md` : plan de la présentation PowerPoint, démonstration, questions probables du jury et checklist.
 
 ### Modifications apportées à l'environnement
@@ -331,6 +332,7 @@ Le test de bout en bout rejoue toute la chaîne : 40 lignes dans MySQL, ETL (29 
 ├── postman/               Collection Postman
 ├── bruno/                 Collection Bruno
 ├── tests/                 Test de bout en bout (e2e.sh) et résultats attendus
+├── presentation/          Présentation PowerPoint
 ├── rapport/               Rapport LaTeX et PDF
 └── docs/                  Guide de la présentation PowerPoint
 ```
