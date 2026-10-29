@@ -1,0 +1,854 @@
+{
+  "info": {
+    "name": "API Produits",
+    "description": "Collection Postman de l'API REST de produits (Exercice 1). Équivalent de la collection Bruno du dossier bruno/. Lancer le dossier « Produits » avec le Collection Runner, dans l'ordre : il crée puis supprime un produit (la base retrouve son état initial).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Produits",
+      "description": "CRUD complet sur /api/v1/produits, à exécuter dans l'ordre.",
+      "item": [
+        {
+          "name": "1. Lister les produits",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"statut 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test(\"la réponse est une page\", function () {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.content).to.be.an(\"array\");",
+                  "  pm.expect(b.page).to.equal(0);",
+                  "  pm.expect(b.size).to.equal(20);",
+                  "  pm.expect(b).to.include.all.keys(\"totalElements\", \"totalPages\");",
+                  "  pm.expect(b.content.length).to.be.at.most(b.totalElements);",
+                  "});",
+                  "pm.test(\"les produits sont triés par id croissant\", function () {",
+                  "  const ids = pm.response.json().content.map(p => p.id);",
+                  "  pm.expect(ids).to.eql(ids.slice().sort((a, b) => a - b));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/produits?page=0&size=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "produits"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2. Lister par catégorie (casse ignorée)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"statut 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test(\"tous les produits sont de la catégorie demandée\", function () {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.content).to.be.an(\"array\");",
+                  "  b.content.forEach(p => pm.expect(p.categorie.toLowerCase()).to.equal(\"informatique\"));",
+                  "  pm.expect(b.totalElements).to.be.at.least(b.content.length);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/produits?categorie=informatique&page=0&size=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "produits"
+              ],
+              "query": [
+                {
+                  "key": "categorie",
+                  "value": "informatique"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3. Créer un produit",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"statut 201\", function () { pm.response.to.have.status(201); });",
+                  "",
+                  "const b = pm.response.json();",
+                  "pm.collectionVariables.set(\"produitId\", b.id);",
+                  "pm.collectionVariables.set(\"dateCreation\", b.dateCreation);",
+                  "pm.collectionVariables.set(\"nom\", b.nom);",
+                  "pm.test(\"le produit est créé avec un id et une date de création\", function () {",
+                  "  pm.expect(b.id).to.be.a(\"number\");",
+                  "  pm.expect(b.dateCreation).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"les champs envoyés sont renvoyés tels quels\", function () {",
+                  "  pm.expect(b.nom).to.equal(\"Clavier mécanique\");",
+                  "  pm.expect(b.description).to.equal(\"Clavier AZERTY rétroéclairé\");",
+                  "  pm.expect(b.prix).to.equal(59.9);",
+                  "  pm.expect(b.quantite).to.equal(25);",
+                  "  pm.expect(b.categorie).to.equal(\"Informatique\");",
+                  "});",
+                  "pm.test(\"l'en-tête Location pointe vers le nouveau produit\", function () {",
+                  "  pm.expect(pm.response.headers.get(\"Location\")).to.match(new RegExp(\"/api/v1/produits/\" + b.id + \"$\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/produits",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "produits"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nom\": \"Clavier mécanique\",\n  \"description\": \"Clavier AZERTY rétroéclairé\",\n  \"prix\": 59.9,\n  \"quantite\": 25,\n  \"categorie\": \"Informatique\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4. Consulter un produit",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"statut 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test(\"le produit renvoyé est celui demandé et complet\", function () {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.id).to.equal(Number(pm.collectionVariables.get(\"produitId\")));",
+                  "  pm.expect(b).to.have.all.keys([\"id\",\"nom\",\"description\",\"prix\",\"quantite\",\"categorie\",\"dateCreation\"]);",
+                  "  pm.expect(b.prix).to.be.a(\"number\");",
+                  "  pm.expect(b.quantite).to.be.a(\"number\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/produits/{{produitId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "produits",
+                "{{produitId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "5. Modifier un produit",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"statut 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "const b = pm.response.json();",
+                  "pm.test(\"tous les champs sont remplacés\", function () {",
+                  "  pm.expect(b.nom).to.equal(\"Clavier mécanique (modifié)\");",
+                  "  pm.expect(b.description).to.equal(\"Clavier QWERTY sans fil\");",
+                  "  pm.expect(b.prix).to.equal(49.9);",
+                  "  pm.expect(b.quantite).to.equal(10);",
+                  "  pm.expect(b.categorie).to.equal(\"Informatique\");",
+                  "});",
+                  "pm.test(\"l'id et dateCreation ne changent pas\", function () {",
+                  "  pm.expect(b.id).to.equal(Number(pm.collectionVariables.get(\"produitId\")));",
+                  "  pm.expect(b.dateCreation).to.equal(pm.collectionVariables.get(\"dateCreation\"));",
+                  "});",
+                  "pm.collectionVariables.set(\"nom\", b.nom);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/produits/{{produitId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "produits",
+                "{{produitId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nom\": \"Clavier mécanique (modifié)\",\n  \"description\": \"Clavier QWERTY sans fil\",\n  \"prix\": 49.9,\n  \"quantite\": 10,\n  \"categorie\": \"Informatique\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "6. Supprimer un produit",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"statut 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test(\"la réponse confirme la suppression et rappelle le produit\", function () {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.message).to.equal(\"Produit \" + Number(pm.collectionVariables.get(\"produitId\")) + \" supprimé\");",
+                  "  pm.expect(b.produit.id).to.equal(Number(pm.collectionVariables.get(\"produitId\")));",
+                  "  pm.expect(b.produit).to.have.all.keys([\"id\",\"nom\",\"description\",\"prix\",\"quantite\",\"categorie\",\"dateCreation\"]);",
+                  "  pm.expect(b.produit.nom).to.equal(pm.collectionVariables.get(\"nom\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/produits/{{produitId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "produits",
+                "{{produitId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "7. Vérifier la suppression (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"statut 404\", function () { pm.response.to.have.status(404); });",
+                  "",
+                  "pm.test(\"message d'erreur explicite\", function () {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.status).to.equal(404);",
+                  "  pm.expect(b.message).to.equal(\"Produit introuvable avec l'id \" + Number(pm.collectionVariables.get(\"produitId\")));",
+                  "  pm.expect(b.path).to.equal(\"/api/v1/produits/\" + Number(pm.collectionVariables.get(\"produitId\")));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/produits/{{produitId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "produits",
+                "{{produitId}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Erreurs",
+      "description": "Cas d'erreur : toutes les réponses suivent le même format JSON.",
+      "item": [
+        {
+          "name": "Créer - données invalides (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"statut 400\", function () { pm.response.to.have.status(400); });",
+                  "",
+                  "const b = pm.response.json();",
+                  "pm.test(\"format d'erreur standard\", function () {",
+                  "  pm.expect(b.status).to.equal(400);",
+                  "  pm.expect(b.error).to.equal(\"Bad Request\");",
+                  "  pm.expect(b.message).to.equal(\"Données invalides\");",
+                  "  pm.expect(b.path).to.equal(\"/api/v1/produits\");",
+                  "  pm.expect(b.timestamp).to.be.a(\"string\");",
+                  "});",
+                  "pm.test(\"chaque champ invalide est signalé avec un message\", function () {",
+                  "  const m = {};",
+                  "  b.details.forEach(d => m[d.champ] = d.message);",
+                  "  pm.expect(Object.keys(m).sort()).to.eql([\"categorie\", \"nom\", \"prix\", \"quantite\"]);",
+                  "  pm.expect(m.nom).to.equal(\"Le nom est obligatoire\");",
+                  "  pm.expect(m.prix).to.equal(\"Le prix doit être positif ou nul\");",
+                  "  pm.expect(m.quantite).to.equal(\"La quantité doit être positive ou nulle\");",
+                  "  pm.expect(m.categorie).to.equal(\"La catégorie est obligatoire\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/produits",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "produits"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nom\": \"\",\n  \"prix\": -5,\n  \"quantite\": -1,\n  \"categorie\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Modifier - données invalides (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"statut 400\", function () { pm.response.to.have.status(400); });",
+                  "",
+                  "pm.test(\"le prix négatif est signalé\", function () {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.message).to.equal(\"Données invalides\");",
+                  "  pm.expect(b.details.map(d => d.champ)).to.eql([\"prix\"]);",
+                  "  pm.expect(b.details[0].message).to.equal(\"Le prix doit être positif ou nul\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/produits/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "produits",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nom\": \"Produit sans prix valide\",\n  \"prix\": -1,\n  \"quantite\": 0,\n  \"categorie\": \"Informatique\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Pagination invalide (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"statut 400\", function () { pm.response.to.have.status(400); });",
+                  "",
+                  "pm.test(\"page et size hors limites sont rejetés\", function () {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.status).to.equal(400);",
+                  "  pm.expect(b.message).to.equal(\"Paramètres invalides\");",
+                  "  const messages = b.details.map(d => d.message);",
+                  "  pm.expect(messages).to.include(\"page doit être >= 0\");",
+                  "  pm.expect(messages).to.include(\"size doit être <= 100\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/produits?page=-1&size=500",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "produits"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "-1"
+                },
+                {
+                  "key": "size",
+                  "value": "500"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Identifiant non numérique (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"statut 400\", function () { pm.response.to.have.status(400); });",
+                  "",
+                  "pm.test(\"le paramètre id est signalé invalide\", function () {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.status).to.equal(400);",
+                  "  pm.expect(b.message).to.equal(\"Valeur invalide pour le paramètre 'id'\");",
+                  "  pm.expect(b.path).to.equal(\"/api/v1/produits/abc\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/produits/abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "produits",
+                "abc"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consulter un produit inexistant (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"statut 404\", function () { pm.response.to.have.status(404); });",
+                  "",
+                  "pm.test(\"message d'erreur explicite\", function () {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.status).to.equal(404);",
+                  "  pm.expect(b.message).to.equal(\"Produit introuvable avec l'id \" + \"999999\");",
+                  "  pm.expect(b.path).to.equal(\"/api/v1/produits/999999\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/produits/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "produits",
+                "999999"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Modifier un produit inexistant (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"statut 404\", function () { pm.response.to.have.status(404); });",
+                  "",
+                  "pm.test(\"message d'erreur explicite\", function () {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.status).to.equal(404);",
+                  "  pm.expect(b.message).to.equal(\"Produit introuvable avec l'id \" + \"999999\");",
+                  "  pm.expect(b.path).to.equal(\"/api/v1/produits/999999\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/produits/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "produits",
+                "999999"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nom\": \"Fantôme\",\n  \"description\": \"N'existe pas\",\n  \"prix\": 1.0,\n  \"quantite\": 1,\n  \"categorie\": \"Test\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Supprimer un produit inexistant (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"statut 404\", function () { pm.response.to.have.status(404); });",
+                  "",
+                  "pm.test(\"message d'erreur explicite\", function () {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.status).to.equal(404);",
+                  "  pm.expect(b.message).to.equal(\"Produit introuvable avec l'id \" + \"999999\");",
+                  "  pm.expect(b.path).to.equal(\"/api/v1/produits/999999\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/produits/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "produits",
+                "999999"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Route inconnue (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"statut 404\", function () { pm.response.to.have.status(404); });",
+                  "",
+                  "pm.test(\"une route inconnue renvoie aussi le format d'erreur JSON\", function () {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.status).to.equal(404);",
+                  "  pm.expect(b.error).to.equal(\"Not Found\");",
+                  "  pm.expect(b.message).to.equal(\"Ressource introuvable : /nimporte\");",
+                  "  pm.expect(b.path).to.equal(\"/nimporte\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/nimporte",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "nimporte"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Supervision",
+      "description": "Santé, métriques Prometheus et contrat OpenAPI.",
+      "item": [
+        {
+          "name": "Santé de l'application",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"statut 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test(\"l'état global et les composants sont UP\", function () {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.status).to.equal(\"UP\");",
+                  "  pm.expect(b.components.db.status).to.equal(\"UP\");",
+                  "  pm.expect(b.components.db.details.database).to.equal(\"PostgreSQL\");",
+                  "  pm.expect(b.components.diskSpace.status).to.equal(\"UP\");",
+                  "  pm.expect(b.components.ping.status).to.equal(\"UP\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Métriques Prometheus",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"statut 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test(\"les métriques JVM et HTTP sont exposées\", function () {",
+                  "  const t = pm.response.text();",
+                  "  pm.expect(t).to.include(\"jvm_memory_used_bytes\");",
+                  "  pm.expect(t).to.include(\"http_server_requests_seconds\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/prometheus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "prometheus"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Contrat OpenAPI",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"statut 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test(\"le contrat décrit les endpoints produits\", function () {",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b.openapi).to.be.a(\"string\");",
+                  "  pm.expect(b.paths).to.have.property(\"/api/v1/produits\");",
+                  "  pm.expect(b.paths).to.have.property(\"/api/v1/produits/{id}\");",
+                  "  pm.expect(b.paths[\"/api/v1/produits/{id}\"].delete.responses).to.have.all.keys(\"200\", \"404\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v3/api-docs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v3",
+                "api-docs"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "produitId",
+      "value": "1"
+    }
+  ]
+}
