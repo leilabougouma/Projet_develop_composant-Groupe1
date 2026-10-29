@@ -303,7 +303,7 @@ Si l'API est arrêtée (`docker compose stop api`), la cible passe à « DOWN »
 | Niveau | Commande | Résultat attendu |
 |---|---|---|
 | Tests Java | `cd api && mvn test` | 27 tests réussis, 0 échec |
-| API (Postman ou Bruno) | Runner de la collection | 18 requêtes, 0 échec |
+| API (Postman ou Bruno) | Runner de la collection (ou `newman` / `bru`) | 18 requêtes, 0 échec |
 | **Bout en bout** | `bash tests/e2e.sh --clean` | **32 contrôles réussis, 0 échec** (code de retour 0) |
 
 Le test de bout en bout rejoue toute la chaîne : 40 lignes dans MySQL, ETL (29 produits chargés, 10 rejets, relance sans doublon), lecture, création, modification et suppression par l'API (avec vérification dans PostgreSQL), erreurs 400 et 404, puis collecte par Prometheus. Le détail de chaque contrôle et les résultats attendus sont dans [tests/RESULTATS-ATTENDUS.md](tests/RESULTATS-ATTENDUS.md).

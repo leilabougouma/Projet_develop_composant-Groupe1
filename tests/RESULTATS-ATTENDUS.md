@@ -6,7 +6,7 @@ Quatre niveaux de tests, du plus rapide au plus complet.
 |---|---|---|---|---|
 | 1. Tests unitaires et d'intégration (JUnit 5, H2) | `cd api && mvn test` | non | ~15 s | 27 tests réussis, 0 échec, 1 ignoré (export OpenAPI) |
 | 2. Collection Postman | Import de `postman/API-Produits.postman_collection.json` puis Runner (ou `newman run ...`) | oui (API lancée) | ~1 s | 18 requêtes, 41 assertions, 0 échec |
-| 3. Collection Bruno | Bruno : *Open Collection* → `bruno/`, environnement *Local*, Runner | oui (API lancée) | ~1 s | 18 requêtes, 0 échec |
+| 3. Collection Bruno | Bruno : *Open Collection* → `bruno/`, environnement *Local*, Runner (ou `cd bruno && npx @usebruno/cli run --env Local -r`) | oui (API lancée) | ~2 s | 18 requêtes, 33 tests, 19 assertions, 0 échec |
 | 4. **Test de bout en bout** | `bash tests/e2e.sh` | oui | 1 à 3 min | **32 contrôles réussis, 0 échec**, code de retour 0 |
 
 Les niveaux 2 et 3 testent l'API seule. Le niveau 4 teste toute la chaîne principale du projet : MySQL → ETL Apache Hop → PostgreSQL → API REST → Prometheus.

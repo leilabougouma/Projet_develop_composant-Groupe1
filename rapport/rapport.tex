@@ -718,7 +718,7 @@ Elles permettent par exemple de repérer une hausse des erreurs 4xx/5xx ou une s
 \section{Partie 5 --- Tests et validation}
 % =====================================================================
 
-La qualité est vérifiée à quatre niveaux, du plus fin au plus global.
+La qualité est vérifiée à quatre niveaux, du plus fin au plus global : tests Java (unitaires et d'intégration), collections Postman et Bruno sur l'API en marche, puis script de bout en bout sur toute la chaîne.
 
 \subsection{Tests unitaires du service}
 
@@ -776,6 +776,15 @@ et laisse donc la base dans son état initial. La collection s'ouvre dans Bruno 
 avec l'environnement \emph{Local} (\code{baseUrl = http://localhost:8080}).
 
 \capture{bruno-runner.png}{Exécution de la collection Bruno avec le Runner.}
+
+\subsection{Collection Postman}
+
+L'énoncé demande de tester l'API avec Postman. Le dossier \code{postman/} contient donc la même collection
+sous forme de fichier Postman (\code{API-Produits.postman_collection.json}) : mêmes 18 requêtes, mêmes trois
+dossiers, mêmes vérifications. Elle s'importe dans Postman (\emph{Import}) et se lance avec le
+\emph{Collection Runner}, ou en ligne de commande avec \code{newman}. La variable \code{baseUrl} vaut
+\code{http://localhost:8080} et la requête de création mémorise l'identifiant du produit, comme dans Bruno.
+Exécutée avec \code{newman} sur l'API en marche le 29 octobre 2026 : \textbf{18 requêtes, 41 assertions, 0 échec}.
 
 \subsection{Test de bout en bout}
 
@@ -844,9 +853,44 @@ Docker (volumes supprimés par \code{docker compose down -v}). Les 9 étapes ré
 \label{tab:resultats}
 \end{table}
 
-Les étapes 4 à 7 ont été rejouées par un script qui envoie les mêmes requêtes et applique les mêmes
-vérifications que la collection Bruno (dossiers \emph{Produits}, \emph{Erreurs} et \emph{Supervision}) ;
-l'exécution dans l'application Bruno elle-même fait l'objet de la capture \texttt{bruno-runner.png}.
+Les étapes 4 à 7 ont été rejouées avec la collection Bruno exécutée en ligne de commande
+(\code{bru run --env Local}, dossiers \emph{Produits}, \emph{Erreurs} et \emph{Supervision}) :
+\textbf{18 requêtes réussies, 33 tests et 19 assertions sans échec}.
+
+\subsection{Script automatisé de bout en bout}
+
+Pour que ce scénario soit rejouable par n'importe quel relecteur, il a été automatisé dans le script
+\code{tests/e2e.sh}. Il suffit de lancer \code{bash tests/e2e.sh --clean} : le script réinitialise les
+volumes Docker, démarre les services, exécute l'ETL, interroge l'API et Prometheus, puis affiche
+\texttt{[OK]} ou \texttt{[KO]} pour chacun des 32 contrôles. Son code de retour vaut 0 si tout réussit, ce
+qui le rend utilisable dans une chaîne d'intégration continue. Contrairement aux collections Postman et
+Bruno, qui ne testent que l'API, il vérifie aussi directement le contenu des deux bases de données.
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{|L{3.6cm}|Y|L{2.4cm}|}
+\hline
+\rowcolor{bleu!15}
+\textbf{Étape} & \textbf{Contrôles} & \textbf{Résultat} \\
+\hline
+Démarrage et source & API \code{UP} ; 40 lignes dans \code{produits_source} & 2 OK \\
+\hline
+ETL & Code de sortie 0 ; 29 produits chargés ; 10 rejets, tous avec un motif ; aucune catégorie hors référentiel ; aucun prix négatif ; relance sans doublon (toujours 29) & 7 OK \\
+\hline
+Lecture par l'API & Liste (\code{totalElements = 29}) ; filtre par catégorie égal au résultat de la requête SQL & 4 OK \\
+\hline
+Création, modification, suppression & 201 ; produit présent dans PostgreSQL ; 200 ; nom modifié en base ; 200 ; 404 après suppression ; produit absent de PostgreSQL ; retour à 29 produits & 10 OK \\
+\hline
+Erreurs & Corps invalide (400, message standard) ; identifiant inexistant (404) ; identifiant non numérique (400) ; pagination invalide (400) & 5 OK \\
+\hline
+Supervision & \code{/actuator/prometheus} (200, métrique HTTP présente) ; cible \code{produits-api} à \code{up = 1} ; requêtes HTTP comptées par Prometheus & 4 OK \\
+\hline
+\end{tabularx}
+\caption{Contrôles du script \code{tests/e2e.sh} (le détail est dans \code{tests/RESULTATS-ATTENDUS.md}).}
+\end{table}
+
+\paragraph{Résultat observé.} Exécuté le 29 octobre 2026 avec l'option \code{--clean} (volumes supprimés,
+images reconstruites) : \textbf{32 contrôles réussis, 0 échec}.
 
 % =====================================================================
 \section{Difficultés rencontrées et solutions}
@@ -927,7 +971,7 @@ branche par fonctionnalité (\code{feat/*}), intégrée dans \code{main} par une
   \item \textbf{Supervision} : ajouter des règles d'alerte (taux d'erreurs, indisponibilité) avec
         Alertmanager, et des tableaux de bord Grafana.
   \item \textbf{Tests} : utiliser Testcontainers pour tester l'API contre un vrai PostgreSQL plutôt que H2,
-        et automatiser le scénario de bout en bout dans une chaîne d'intégration continue.
+        et exécuter le script \code{tests/e2e.sh} dans une chaîne d'intégration continue à chaque modification.
   \item \textbf{Évolution de l'API} : versionnement déjà prévu par le préfixe \code{/api/v1} ; ajout possible
         de la recherche par nom, du tri configurable et de la suppression logique.
 \end{itemize}
@@ -940,7 +984,7 @@ Le projet atteint son objectif : une chaîne complète, reproductible et vérifi
 brutes et imparfaites en un service web fiable et supervisé. L'ETL garantit la qualité des données, la base
 cible la protège par des contraintes, l'API l'expose avec un contrat clair et des erreurs homogènes, et
 Prometheus permet de suivre son comportement. La combinaison de Docker Compose, d'un contrat OpenAPI
-versionné, de 27 tests automatisés et d'une collection Bruno rend le projet facile à lancer, à relire et à
+versionné, de 27 tests automatisés, de collections Postman et Bruno et d'un script de bout en bout rend le projet facile à lancer, à relire et à
 faire évoluer. Le travail en groupe, avec des parties indépendantes reliées par des conventions communes
 (schéma SQL, variables d'environnement, ports), a permis d'avancer en parallèle sans blocage.
 
@@ -963,6 +1007,9 @@ docker compose run --rm etl
 # 4. Vérifier
 curl http://localhost:8080/actuator/health
 curl "http://localhost:8080/api/v1/produits?size=100"
+
+# 5. Test de bout en bout (32 contrôles attendus)
+bash tests/e2e.sh
 \end{Code}
 
 \begin{table}[H]
@@ -996,7 +1043,9 @@ curl "http://localhost:8080/api/v1/produits?size=100"
 |-- etl/                    projet Apache Hop, référentiel de catégories, Dockerfile
 |-- api/                    API Spring Boot : src/, pom.xml, Dockerfile, openapi.yaml
 |-- monitoring/             prometheus.yml
+|-- postman/                collection Postman (18 requêtes)
 |-- bruno/                  collection Bruno (18 requêtes)
+|-- tests/                  e2e.sh (bout en bout) et résultats attendus
 |-- rapport/                ce rapport (LaTeX)
 `-- docs/                   guide de préparation de la présentation
 \end{Code}
